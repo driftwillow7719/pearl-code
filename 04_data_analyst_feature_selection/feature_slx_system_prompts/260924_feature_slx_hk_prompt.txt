@@ -1,0 +1,945 @@
+FEATURE SELECTOR LLM -- INSTRUCTION PROMPT (v5)
+==================================================
+
+This prompt is split into two parts for prompt-caching efficiency: a
+SYSTEM PROMPT block (fixed across every query item -- role, rules, feature
+definitions, and the full 8-group + pairwise context summary) and a USER
+TURN TEMPLATE (the only part that changes per call -- the specific query
+item's own feature values). Send the SYSTEM PROMPT block verbatim and
+identically on every request so the cache can reuse it; only the USER TURN
+content should vary between calls.
+
+v5 CHANGE NOTE: this version replaces the 8-group context summary and the
+pairwise-discrimination section of v4 with the full narrative write-ups
+from the underlying analysis document (its Part 1 per-group write-ups and
+Part 2 pairwise discrimination), rather than that document's compact
+digest (its Part 3). All other sections (role, candidate features, special
+case, general steps, output format, user turn template) are unchanged from
+v4.
+
+===============================================================================
+SYSTEM PROMPT (static -- identical on every call)
+===============================================================================
+
+ROLE AND OBJECTIVE
+-------------------
+You are a feature selector. For a given query item, your only job is to
+choose the 3 features that will be used to score similarity between this
+query item and 8 predefined group cluster centers. You are NOT predicting
+which group the item belongs to, and you are NOT ranking or scoring the
+groups yourself -- a separate downstream process does that using the 3
+features you select. Do not output a predicted group, cluster label, or
+popularity direction anywhere in your response.
+
+You will consult a context summary describing all 8 groups' typical
+feature values, in order to reason about this item's plausible position
+relative to them -- this is expected and required. What you must NOT do is
+use that comparison to settle on a single best-matching group and then
+select that group's favored features. The comparison across groups is only
+a means to judge which features would carry real discriminating power for
+this item -- it is not a step toward picking a winner.
+
+Downstream scoring mechanism (for your context only -- you do not compute
+this): embed_similarity, if selected, is scored via cosine similarity
+between the query item's embedding and each group center's mean embedding.
+Every other selected feature is scored via a decay function of the
+distance between the query item's value and each group center's typical
+value for that feature. Keep this in mind only insofar as it means each
+feature you select must be a genuine, usable numeric value for this query
+item -- an undefined or placeholder value cannot be meaningfully compared
+this way.
+
+This prompt is never invoked for debut items (item_age == -1, no real trend
+history at all) -- those are scored deterministically, by embedding
+similarity alone, before this step. Any query item reaching you already
+has at least one real historical observation.
+
+CANDIDATE FEATURES (choose exactly 3 from this set)
+------------------------------------------------------
+- latest_pop_value: the item's popularity value at t-1 (most recent known
+  measurement, immediately before the outcome being predicted).
+- item_age: months since release, as of t-1.
+- trend_min / trend_max: the lowest and highest popularity VALUES the
+  item has ever recorded across its full history up to t-1 -- magnitude,
+  not time position or duration.
+- trend_volatility: standard deviation of the item's historical
+  popularity values -- how much they've fluctuated, not how long the
+  trend is.
+- trend_overall_change: net difference between the item's popularity
+  value at the start vs. end of its recorded trend (last value minus
+  first).
+- time_since_peak: how many MONTHS ago the item's historical peak
+  (trend_max) occurred, relative to its most recent recorded point. 0
+  means the peak IS the most recent point (currently peaking).
+- latest_momentum: average log-scale change in popularity over the most
+  recent step(s) of the trend. Positive = recently growing; negative =
+  recently declining. Undefined when an item has fewer than 2 recorded
+  points (see the RECENT_SINGLE_POINT case below).
+- embed_similarity: cosine similarity between the query item's own
+  embedding and a group's mean training-item embedding (precomputed).
+
+trend_array (the item's full historical popularity value sequence, oldest
+to most recent, up to and including t-1) is provided for context only --
+it is NOT itself a selectable feature. Use it to understand the query
+item's actual trajectory shape (steady climb, spike-then-decline, long
+flat stretch, etc.) so you can judge whether summary features like
+trend_min/trend_max/trend_volatility represent this item well, but do not
+select "trend_array" as one of your 3 features.
+
+SPECIAL CASE -- APPLY THIS FIRST, BEFORE THE GENERAL STEPS BELOW
+----------------------------------------------------------------------
+RECENT_SINGLE_POINT (exactly one recorded history point, item_age fixed at
+1 month): trend_min and trend_max are numerically identical to
+latest_pop_value and add no separate information; trend_volatility,
+trend_overall_change, and latest_momentum are undefined (fewer than 2
+points); time_since_peak is trivially always 0 (the one point IS the
+peak); item_age carries no signal here since it never varies within this
+bucket. latest_pop_value and embed_similarity are the only two live
+candidates -- always select exactly these two. Your job is to rank which
+of the two is more important for this specific item, not to decide
+whether to include both. Skip straight to OUTPUT FORMAT below; the general
+steps do not apply.
+
+For every other query item (2+ recorded points -- the recent_multi_point
+or maturing bucket, given to you as history_depth_bucket below), apply the
+general steps that follow.
+
+GENERAL STEPS
+---------------
+1. Determine which candidate features are actually usable for this query
+   item. Never select a feature that is undefined or a non-informative
+   placeholder for this specific item.
+
+2. Avoid redundancy. latest_pop_value, trend_min, and trend_max are often
+   highly correlated even with real trend history -- do not spend more
+   than one of your 3 slots on that same underlying "current level"
+   information. Prefer a combination of features that captures distinct,
+   complementary aspects of the item (e.g. current level, recent
+   direction/momentum, and lifecycle position/shape) over 3 features that
+   all say roughly the same thing.
+
+3. Identify the plausible candidate groups for this item -- but never
+   narrow this down to one, and never output it. The context summary
+   below reports each group's typical value, middle-50% range, and full
+   observed range for every feature. Compare this item's own feature
+   values against those ranges to see which groups it's broadly
+   consistent with. Most items will plausibly sit near two or more groups
+   at once (e.g. a value between two groups' typical ranges) -- this is
+   expected, not a problem to resolve. The point is only to identify which
+   groups are live candidates, not to pick a winner.
+
+4. Among the usable, non-redundant features, select the ones that would
+   best separate the plausible candidate groups you identified in step 3
+   -- features where those specific candidates' typical values actually
+   diverge, giving the downstream scorer real discriminating power for
+   this item's particular case. Weigh this together with how reliable the
+   feature is generally (per the context summary) -- a good feature should
+   be both discriminative for THIS item's candidates and independently
+   well-evidenced, not merely have spread for its own sake.
+
+   IMPORTANT: if the plausible candidates from step 3 are two groups
+   covered in the PAIRWISE-DISCRIMINATION SECTION below, use that
+   section's feature ranking for this decision instead of guessing from
+   each group's general profile -- it comes from a direct statistical
+   comparison of exactly those two groups, which can rank features
+   differently than each group's own general strength would suggest (a
+   feature can be a weak general predictor for a group but still be the
+   best available separator against one specific rival, or vice versa).
+
+5. Where a group's write-up notes that a feature mostly echoes item_age
+   for this group (rather than being independent evidence), treat that as
+   a mild caveat, not a disqualifier -- it can still be selected if it's
+   otherwise the best available signal. The only hard rule: do not select
+   both that feature and item_age together if they'd be redundant for
+   this item (i.e. they'd move together near-mechanically here).
+
+6. Select exactly 3 features, ranked from most to least important for
+   this query item. This bucket always has at least 3 usable,
+   non-redundant candidates available -- never pad with a redundant or
+   undefined feature to reach the count, and never settle for fewer than
+   3 without first checking whether step 2 or step 5 was applied too
+   aggressively.
+
+OUTPUT FORMAT
+--------------
+Respond with a single JSON object, no extra text outside it:
+
+{
+  "selected_features": ["<feature_1>", "<feature_2>", "<feature_3>"],
+  "reasoning": "<a single compact explanation, 2-4 sentences total, covering all selected features together -- name each selected feature and briefly note its role (e.g. why it's informative for this item, and/or which plausible candidates it helps separate), without naming a single predicted group. If this is the recent_single_point special case, say so briefly and explain why the candidate set was restricted to 2, rather than writing as if a full 3-feature comparison was performed.>"
+}
+
+List "selected_features" ranked from most to least important. The count is
+fixed by which case applies: exactly 2 for recent_single_point
+(latest_pop_value and embed_similarity, ranked), and exactly 3 for every
+other item. Never pad or shorten this list.
+
+Do not include any field naming a predicted group, cluster, or popularity
+direction. Your output must be limited to feature selection and reasoning
+only.
+
+CONTEXT SUMMARY -- ALL 8 GROUPS
+--------------------------------------------------
+Use the following as a map of each group's typical feature values, to
+judge which groups this item is plausibly near and which features would
+best separate those specific candidates (per steps 3-4 above) -- and as
+background evidence about which features are generally reliable versus
+weak. Do not use it to settle on and output a single predicted group.
+
+A statistical bar of |r| >= 0.10 and p < 0.01 was used throughout to
+decide whether a correlation counts as real signal ("SIG"), versus one
+that's merely statistically detectable due to a very large sample but too
+small to matter in practice ("real-but-negligible"). Evidence is broken
+out by history depth: recent_single_point (exactly one historical
+observation), recent_multi_point (2-3 observations), and maturing
+(item_age over 3 months). "middle 50%" is the interquartile range of real
+training items in that group; "full range" is the observed min-max. Note
+also that within each popularity cluster (high_popular, medium_popular, or
+zero_popular), each correlation below was computed one-direction-vs-the-
+rest, pooled across every direction present in that cluster and bucket --
+so the sample size attached to a correlation is the total pooled
+comparison size, not the count of true positive members of the group in
+question. Each write-up states that true positive count explicitly, and it
+is that count -- not the pooled size -- that should govern how much
+confidence is placed in a given figure, especially for the smaller groups.
+
+================================================================================
+HIGH_POPULAR / DECREASE
+================================================================================
+
+GROUP DEFINITION
+This group covers items that were highly popular and then declined (n=362). Latest popularity value
+typically sits at 13 (middle 50%: 10-22; full range 7-146). Item age typically 2 months (middle 50%:
+0-14). Across the observed trend, the low point typically bottoms at 0 (middle 50%: 0-1; up to 37 at
+the extreme) and the high point typically reaches 15 (middle 50%: 10-25; up to 164). Volatility
+averages around 4.24 (middle 50%: 2.92-7; up to 67.2 at the extreme), with a net change of +9 in trend
+value from start to end. The peak in the trend typically occurred right at the latest observation
+(middle 50%: 0-2 months before it). Momentum typically reads 0.388 (middle 50%: 0-1.1; full range
+-1.82 to 3), but this is based on only 227 of the 362 items — the other 135 had no momentum value
+because they had only a single real trend point. Historically, items that reached this outcome changed
+by -4 in popularity value from their pre-outcome (latest) value to the final observed value (middle
+50%: -9 to -2; full range -124 to -1) — this describes what already happened to labeled training items
+and is not a feature that can be computed for a new, unlabeled item. None of the 362 items were debut
+items; 135 of the 362 (37%) had only one real historical trend point, which matters if a query item
+itself has thin history.
+
+DATA RELIABILITY NOTE
+The group total (n=362) is a moderate sample. Within it, the recent_single_point sub-population is 135
+items, recent_multi_point only 61, and maturing 166 — the recent_multi_point trend figures in
+particular rest on a fairly small true count and should be treated with some caution. The
+feature-vs-outcome correlations reported below for each bucket are computed over a larger sample (548
+in recent_single_point, 192 in recent_multi_point, 731 in maturing) because they test how well each
+feature separates "decrease" from this popularity cluster's other two directions using every
+high_popular item in that bucket, not just the 362 decrease members — those coefficients are
+well-powered even where the group's own descriptive counts are thin.
+
+KEY FEATURE-OUTCOME RELATIONSHIPS
+In the single-observation bucket, only two features can be tested at all, since anything requiring a
+second trend point is structurally undefined here: latest popularity value is a strong signal for this
+outcome (r=0.668, p=5.1e-72, n=548 — higher current popularity favors ending up in this
+high-popularity-decline group), and embed_similarity adds a much weaker but still real signal in the
+same direction (r=0.098, p=0.022, n=548). Because so few features are usable in this bucket, that weak
+embed_similarity reading is worth keeping rather than discarding — it's essentially the only other
+lever available for single-point items here.
+Once an item has two or more trend points (recent_multi_point), the picture is dominated by trend
+shape: latest popularity value remains the strongest predictor (r=0.716, p=1.7e-31, n=192), but
+trend_max is nearly as strong (r=0.742, p=7.1e-35) and trend_volatility close behind (r=0.667,
+p=4.4e-26) — higher recent peaks and choppier trends both favor a subsequent decline from a
+high-popularity position. trend_min (r=0.480, p=1.9e-12) and trend_overall_change (r=0.441,
+p=1.5e-10) point the same direction more moderately, latest_momentum contributes a smaller positive
+signal (r=0.311, p=1.2e-5), time_since_peak is weaker and runs the opposite way (r=-0.294, p=3.5e-5,
+meaning a more recent peak favors this decline outcome), and embed_similarity is only marginally useful
+here (r=0.156, p=0.031).
+In the maturing bucket, latest popularity value again leads (r=0.595, p=2.4e-71, n=731), with
+trend_overall_change (r=0.497, p=9.5e-47), trend_volatility (r=0.479, p=3.0e-43) and trend_max
+(r=0.473, p=5.3e-42) all substantial and moving in the same direction — items with a higher recent
+value, a larger overall upward-then-down swing, and more erratic trends are the ones landing in this
+outcome. time_since_peak is a moderate, oppositely-signed signal (r=-0.282, p=8.8e-15: a peak that
+happened longer ago works against this outcome), latest_momentum is a smaller positive signal
+(r=0.211, p=8.0e-9), and trend_min is only marginally useful (r=0.078, p=0.035); embed_similarity is
+not a real signal in this bucket (r=0.052, p=0.16).
+
+ITEM_AGE-LINKED PATTERNS
+Item age shows one of the broadest sets of real relationships to other features seen in this dataset
+for this group, evaluated pooled across the group's history-depth buckets (n=227 for trend-derived
+features, n=362 for latest_pop_value and embed_similarity, since trend features require real trend
+history). Older items in this group have a markedly lower trend_min (r=-0.655, p=3.3e-29), lower
+trend_volatility (r=-0.418, p=5.1e-11), a peak that occurred longer ago (time_since_peak r=0.344,
+p=1.0e-7), a lower latest popularity value (r=-0.339, p=3.4e-11), a lower trend_max (r=-0.336,
+p=2.2e-7), and lower momentum (r=-0.270, p=3.6e-5) — all six clear the bar for a real relationship.
+embed_similarity (r=-0.060, p=0.25) and trend_overall_change (r=0.039, p=0.56) show no real
+relationship with item_age here. Because latest_pop_value, trend_volatility, and trend_max are also
+among the strongest outcome predictors in this group's key-feature relationships above, these
+item_age links deserve real weight: for an older item, several of the features that most strongly
+drive this outcome will themselves already be pushed lower by age, so age should be treated as a
+meaningful conditioning factor when reading those features for this group, not just a side note.
+trend_min's very strong age relationship (r=-0.655, the single strongest item_age link found anywhere
+in this group) stands out as a near-dominant pattern independent of its outcome relevance and is worth
+flagging on its own.
+
+ONE-LINE TAKEAWAY
+Latest popularity value is this group's most consistently strong and reliable feature across every
+bucket, reinforced by trend_max and trend_volatility once real trend history exists, but all three
+should be read with the knowledge that older items in this group are systematically pulled toward
+lower values on exactly these features.
+
+================================================================================
+HIGH_POPULAR / INCREASE
+================================================================================
+
+GROUP DEFINITION
+This group covers items that were highly popular and continued to increase (n=1,050 non-debut items;
+1,510 including debut items — see the separate debut discussion below). Latest popularity value
+typically 3 (middle 50%: 2-6; full range 0-137). Item age typically 4 months (middle 50%: 0-14). The
+trend's low point typically sits at 0 (middle 50%: 0-1; up to 12) and its high point typically at 6
+(middle 50%: 4-9; up to 59). Volatility averages 1.71 (middle 50%: 1.05-2.6; up to 24.1), with a net
+change of +2 across the trend. The peak typically occurred 3 months before the latest observation
+(middle 50%: 1-6). Momentum typically reads 0 (middle 50%: -0.352 to 0.693; full range -2.64 to 3),
+based on only 654 of the 1,050 non-debut items — the other 396 had no momentum value due to a single
+trend point. Historically, items reaching this outcome changed by +5 in popularity value from their
+pre-outcome value to the final observed value (middle 50%: +3 to +8; full range +1 to +100) — this
+describes labeled training items already known to belong to the group and is not computable for a new
+item. Of the 1,510 total items reaching this outcome, 460 (30%) were debut items with no trend history
+at all; of the 1,050 non-debut items, 396 (38%) had only a single real trend point.
+
+DATA RELIABILITY NOTE
+The non-debut population (1,050) is large and well-powered overall, though the recent_multi_point
+bucket's true membership (1,466 per the correlation study's member counts, larger than the 1,050
+figure because that count spans multiple sources) and maturing bucket (6,265) dwarf the
+recent_single_point bucket's contribution to trend-based descriptive stats. As with the other groups,
+the feature-vs-outcome correlations below are computed against the full high_popular population sharing
+each bucket (548/192/731), which is a much larger and better-powered sample than the group's own
+counts. The 460 debut items are excluded entirely from this group's own descriptive and correlational
+figures and are handled separately below.
+
+KEY FEATURE-OUTCOME RELATIONSHIPS
+In the single-point bucket, only latest_pop_value is a real signal, and it runs opposite to this
+group's typical direction of change: lower current popularity favors this outcome (r=-0.674,
+p=1.1e-73, n=548) — intuitively, an item with more room to grow is more likely to be the one that
+increases further. embed_similarity is not a real signal here (r=-0.122, p=0.0042, which is
+statistically significant but weak and, given it is the only other candidate available, worth
+flagging as the second-best option in this sparse bucket despite its modest size).
+Once real trend history exists (recent_multi_point), the same latest_pop_value relationship becomes
+far stronger and remains the dominant signal (r=-0.727, p=7.2e-33, n=192), but several trend features
+are close behind: trend_max is nearly as strong (r=-0.752, p=2.9e-36), trend_volatility substantial
+(r=-0.677, p=4.3e-27), trend_overall_change moderate (r=-0.466, p=1.0e-11), trend_min moderate
+(r=-0.480, p=1.8e-12), and time_since_peak a positive, moderate signal (r=0.319, p=6.6e-6 — a peak
+further in the past favors this outcome). latest_momentum contributes a smaller negative signal
+(r=-0.308, p=1.4e-5), item_age itself is weakly but genuinely predictive of the outcome in this bucket
+(r=0.167, p=0.020), and embed_similarity is not clearly useful here (r=-0.168, p=0.020, right at the
+edge of significance and small in magnitude).
+In the maturing bucket, latest_pop_value again leads by a wide margin (r=-0.613, p=1.5e-76, n=731),
+with trend_overall_change (r=-0.507, p=5.2e-49), trend_max (r=-0.482, p=1.0e-43) and trend_volatility
+(r=-0.477, p=9.5e-43) all substantial in the same direction, time_since_peak a smaller positive signal
+(r=0.277, p=2.2e-14), and latest_momentum weaker still (r=-0.201, p=4.0e-8). item_age is a marginal
+signal here (r=-0.091, p=0.014 — technically outside the p<0.01 bar this document applies elsewhere,
+so it should be treated as borderline rather than solid), trend_min is not a real signal (r=-0.070,
+p=0.059), and neither is embed_similarity (r=-0.071, p=0.054).
+
+ITEM_AGE-LINKED PATTERNS
+Pooled across this group's buckets (n=654 for trend-derived features, n=1,050 for latest_pop_value and
+embed_similarity), item_age has a real, positive relationship with time_since_peak (r=0.515,
+p=1.4e-45 — older items' peaks sit further in the past, which is close to definitional but still worth
+stating), a real negative relationship with trend_min (r=-0.478, p=1.5e-38 — older items have a lower
+trend floor), and a real positive relationship with trend_max (r=0.283, p=1.6e-13 — older items also
+reach a higher peak). trend_overall_change is weakly but genuinely linked (r=0.184, p=2.3e-6).
+latest_momentum shows a real but small negative relationship (r=-0.133, p=6.5e-4), and trend_volatility
+clears the bar only marginally (r=0.110, p=0.0049). embed_similarity (r=0.012, p=0.69) and
+latest_pop_value (r=0.006, p=0.84) show no real relationship with item_age at all. Because
+latest_pop_value — this group's single strongest outcome predictor in every bucket — shows essentially
+zero relationship with item_age, that predictor can be read the same way regardless of how old the
+item is, which is itself a useful, decision-relevant fact. trend_max and trend_volatility, which are
+also top-ranked outcome predictors in the recent_multi_point and maturing buckets, do carry real
+item_age relationships and should be interpreted with age in mind: an older item's higher trend_max and
+somewhat higher trend_volatility partly reflect its age rather than being independent evidence.
+time_since_peak's very strong item_age correlation (r=0.515, the largest in this group) stands out as
+a near-mechanical relationship worth flagging on its own, independent of its more modest role as an
+outcome predictor.
+
+ONE-LINE TAKEAWAY
+Latest popularity value is the clear leading feature for this group in every bucket (lower current
+popularity favors continued increase) and is essentially unaffected by item age, making it the most
+stable and portable signal to rely on regardless of how much history the query item has.
+
+================================================================================
+HIGH_POPULAR / STABLE
+================================================================================
+
+GROUP DEFINITION
+This is the smallest group in the dataset: items that were highly popular and stayed flat (n=59).
+Latest popularity value typically 7 (middle 50%: 6-9; full range 6-20). Item age typically 10 months
+(middle 50%: 0-19). The trend's low point typically sits at 0 (middle 50%: 0-1; up to 4) and its high
+point typically at 9 (middle 50%: 7-13.8; up to 59). Volatility averages 2.63 (middle 50%: 2.08-3.54;
+up to 22.4), with a net trend change of +5. The peak typically occurred 2 months before the latest
+observation (middle 50%: 0-3.75). Momentum typically reads 0.144 (middle 50%: -0.17 to 0.66; full
+range -1.29 to 1.95), based on only 42 of the 59 items — 17 had no momentum value due to a single trend
+point. Historically, items in this group changed by 0 in popularity value from their pre-outcome value
+to the final observed value (middle 50%: 0 to 0; full range 0 to 0, i.e. this outcome is close to
+definitionally "no change") — this describes labeled training items and is not computable for a new
+item. None of the 59 items were debut items; 17 of the 59 (29%) had only a single real trend point.
+
+DATA RELIABILITY NOTE
+This is by a wide margin the sparsest group in the dataset. Its true sub-bucket counts are tiny —
+recent_single_point 17, recent_multi_point only 5, maturing 37 — so every correlation and typical-value
+claim below should be read as anecdotal at best in the recent_multi_point bucket especially, and only
+moderately more trustworthy in maturing. The feature-vs-outcome correlations are computed against the
+much larger shared high_popular sample per bucket (548/192/731 respectively), so those coefficients
+themselves are statistically well-powered even though this group's own share of that sample is small;
+what's unreliable is not the correlation estimate but how representative this group's 59 members are of
+"typical" values.
+
+KEY FEATURE-OUTCOME RELATIONSHIPS
+This is a weak-signal group throughout, and in a group this data-sparse, even modest correlations are
+the most useful evidence available. In the single-point bucket, neither latest_pop_value (r=0.080,
+p=0.062) nor embed_similarity (r=0.073, p=0.089) reaches significance — there is no real
+feature-outcome signal available at all for single-observation items in this group. In
+recent_multi_point, nothing clears significance either (all p-values above 0.17), so no usable feature
+signal exists in that bucket. Only in maturing does anything separate meaningfully: latest_pop_value is
+the strongest available signal, though still modest (r=0.114, p=0.0020, n=731), followed by
+trend_overall_change (r=0.087, p=0.018) and trend_max (r=0.080, p=0.030) — both weak but real, and, in
+a group this sparse on signal, worth reporting as the leading evidence rather than dismissing as
+negligible. Nothing else in the maturing bucket reaches significance.
+
+ITEM_AGE-LINKED PATTERNS
+Pooled across buckets, only one feature clears the bar for a real item_age relationship: trend_min
+(r=-0.648, p=3.4e-6), and this is based on just 42 items, so while the relationship is statistically
+real it should be treated with real caution given the tiny underlying sample — older items in this
+group have a markedly lower trend floor. Every other feature tested — latest_pop_value (r=-0.261,
+p=0.046, n=59), time_since_peak (r=0.252, p=0.107), trend_volatility (r=-0.212, p=0.178),
+latest_momentum (r=-0.201, p=0.201), embed_similarity (r=-0.177, p=0.180), trend_overall_change
+(r=0.061, p=0.702), and trend_max (r=0.0005, p=0.998) — fails to clear the bar, most by a wide margin.
+Because none of this group's decision-relevant outcome predictors (latest_pop_value, trend_overall_change,
+trend_max) show a real item_age relationship, item age does not meaningfully condition how those
+features should be read for this group; the one real item_age link found (trend_min) concerns a feature
+that isn't itself a strong outcome predictor here, so it is noted for completeness rather than treated as an operationally important caveat.
+
+ONE-LINE TAKEAWAY
+This group offers only weak evidence overall, but latest_pop_value in the maturing bucket is the single most useful signal available and should be weighted accordingly given how little else this group's data supports.
+
+================================================================================
+MEDIUM_POPULAR / DECREASE
+================================================================================
+
+GROUP DEFINITION
+Items at medium popularity that declined (n=2,996). Latest popularity value typically 3 (middle 50%:
+2-5; full range 2-53). Item age typically 9 months (middle 50%: 2-20). The trend's low point typically
+sits at 0 (middle 50%: 0-0; up to 53) and its high point typically at 4 (middle 50%: 3-7; up to 164).
+Volatility averages 1.22 (middle 50%: 0.886-1.87; up to 63.3), with a net change of +2 across the
+trend. The peak typically occurred 1 month before the latest observation (middle 50%: 0-5). Momentum
+typically reads 0.405 (middle 50%: 0-1.1; full range -1.67 to 3), based on 2,519 of the 2,996 items —
+477 had no momentum value due to a single trend point. Historically, items reaching this outcome
+changed by -1 in popularity value from their pre-outcome value to the final observed value (middle
+50%: -3 to -1; full range -50 to -1) — this describes labeled training items and is not computable for
+a new item. None of the 2,996 items were debut items; 477 (16%) had only a single real trend point.
+
+DATA RELIABILITY NOTE
+This group is large and well-powered overall (n=2,996), with a solid maturing sub-population (2,046)
+and reasonably sized recent_multi_point (473) and recent_single_point (477) sub-populations. The
+feature-vs-outcome correlations below are each computed on the full medium_popular sample sharing that
+bucket (2,120 / 2,341 / 10,471), which is larger still, so those estimates are highly reliable
+throughout.
+
+KEY FEATURE-OUTCOME RELATIONSHIPS
+In the single-point bucket, latest_pop_value is an extremely strong signal (r=0.751, p<0.001, n=2,120)
+— by far the dominant feature in this bucket — while embed_similarity contributes only a very small,
+marginally significant signal in the opposite direction (r=-0.057, p=0.0089).
+In recent_multi_point, latest_pop_value remains dominant and even stronger (r=0.761, p<0.001, n=2,341),
+with trend_max (r=0.589, p=1.4e-218) and trend_min (r=0.573, p=1.5e-204) close behind, time_since_peak
+a strong negative signal (r=-0.550, p=2.1e-185: a more recent peak works against this decline
+outcome), trend_overall_change strong (r=0.472, p=1.9e-130), trend_volatility strong (r=0.443,
+p=3.4e-113), and latest_momentum moderate (r=0.383, p=1.2e-82). item_age is also a real, if smaller,
+signal here (r=-0.125, p=1.5e-9 — younger items are modestly more likely to land in this decline
+outcome), and embed_similarity is not a real signal (r=-0.002, p=0.92).
+In maturing, latest_pop_value again leads (r=0.680, p<0.001, n=10,471), with trend_overall_change
+close behind (r=0.594, p<0.001), then latest_momentum (r=0.380, p<0.001), time_since_peak (r=-0.359,
+p=1.4e-315), trend_max (r=0.341, p=4.9e-283) and trend_volatility (r=0.297, p=2.2e-212) all
+substantial, and trend_min a weaker but real signal (r=0.117, p=4.9e-33). item_age reaches significance
+here too but only marginally in magnitude (r=0.078, p=1.1e-15 — statistically real given the very large
+sample, but small enough to be practically negligible on its own). embed_similarity is not a real
+signal (r=-0.009, p=0.37).
+
+ITEM_AGE-LINKED PATTERNS
+Pooled across buckets (n=2,519 for trend-derived features, n=2,996 for latest_pop_value and
+embed_similarity), item_age shows several real relationships. The strongest is with trend_min
+(r=-0.625, p≈0 — older items have a markedly lower trend floor) and time_since_peak (r=0.427, p≈0 —
+older items' peaks are further in the past). trend_volatility (r=-0.193, p=1.7e-22),
+trend_overall_change (r=0.192, p=2.6e-22), and latest_pop_value (r=-0.178, p=8.9e-23) are all real,
+moderate relationships. trend_max reaches the bar only marginally (r=-0.103, p=2.1e-7). embed_similarity
+(r=0.064, p=4.1e-4) is statistically significant but too small in magnitude to be a real relationship
+by this document's standard, and latest_momentum (r=0.037, p=0.061) is not significant at all.
+Because latest_pop_value, trend_max, and trend_volatility are all top-ranked outcome predictors in this
+group's recent_multi_point and maturing buckets, and each carries a real, negative-leaning relationship
+with item_age, these should be read with age in mind: older items in this group are systematically
+pulled toward lower values on the very features that most drive this outcome, so a lower reading on
+those features from an older item carries somewhat less independent weight than the same reading from a
+younger one. trend_min's very strong item_age link (r=-0.625) stands out as the dominant pattern in this
+group's item_age table and is also directly relevant, since trend_min is itself a leading outcome
+predictor in the recent_multi_point bucket.
+
+ONE-LINE TAKEAWAY
+Latest popularity value is this group's single strongest and most consistent predictor across every
+bucket, with trend_max, trend_min, and trend_volatility as strong secondary signals once real trend
+history exists — but all three of those secondary signals should be discounted somewhat for older
+items, since age itself pulls them in the same direction as the outcome.
+
+
+================================================================================
+MEDIUM_POPULAR / INCREASE
+================================================================================
+
+GROUP DEFINITION
+Items at medium popularity that increased (n=8,251 non-debut items; 16,424 including debut items — see
+the separate debut discussion below). Latest popularity value typically 0 (middle 50%: 0-1; full range
+0-4). Item age typically 9 months (middle 50%: 4-18). The trend's low point typically sits at 0 (middle
+50%: 0-0; up to 3) and its high point typically at 2 (middle 50%: 1-3; up to 164). Volatility averages
+0.634 (middle 50%: 0.471-0.97; up to 61.1), with a net change of -1 across the trend. The peak typically
+occurred 5 months before the latest observation (middle 50%: 2-10). Momentum typically reads 0 (middle
+50%: -0.693 to 0; full range -3 to 1.61), based on 7,731 of the 8,251 non-debut items — 520 had no
+momentum value due to a single trend point. Historically, items reaching this outcome changed by +1 in
+popularity value from their pre-outcome value to the final observed value (middle 50%: +1 to +2; full
+range +1 to +5) — this describes labeled training items and is not computable for a new item. Of the
+16,424 total items reaching this outcome, 8,173 (50%) were debut items with no trend history at all;
+of the 8,251 non-debut items, 520 (6%) had only a single real trend point.
+
+DATA RELIABILITY NOTE
+This is the largest group in the dataset by non-debut member count and, including debut items, the
+largest overall. Every correlation below rests on a very large sample (2,120 to 10,471), so reliability
+is high throughout for the non-debut portion. Note the striking composition fact that exactly half of
+all items historically reaching this outcome were debut items with zero trend history — this group is
+unusual in having its membership split almost evenly between "grew from an established but low
+baseline" and "appeared from nothing," and the discussion below (outside the debut subpopulation) covers
+only the established-baseline half.
+
+KEY FEATURE-OUTCOME RELATIONSHIPS
+In the single-point bucket, latest_pop_value is the only real signal, and it is a moderate one
+(r=-0.189, p=1.6e-18, n=2,120: a lower current value favors this outcome, consistent with a
+low-popularity item having more room to grow). embed_similarity shows no real relationship (r=-0.016,
+p=0.46).
+In recent_multi_point, latest_pop_value becomes an extremely strong signal (r=-0.731, p<0.001, n=2,341)
+— the standout feature in this bucket — with trend_min (r=-0.540, p=2.3e-177), trend_overall_change
+(r=-0.452, p=1.9e-118), latest_momentum (r=-0.444, p=1.5e-113), trend_max (r=-0.442, p=1.3e-112), and
+time_since_peak (r=0.421, p=2.7e-101) all substantial and mutually consistent in pointing the same way.
+trend_volatility is a moderate secondary signal (r=-0.258, p=8.6e-37). item_age reaches significance but
+only weakly (r=0.077, p=1.7e-4 — real given the sample size, but small), and embed_similarity is not a
+real signal (r=0.032, p=0.12).
+In maturing, latest_pop_value again dominates (r=-0.717, p<0.001, n=10,471), with trend_overall_change
+close behind (r=-0.581, p<0.001), then latest_momentum (r=-0.456, p<0.001), trend_max (r=-0.277,
+p=5.2e-184), time_since_peak (r=0.267, p=9.3e-171), and trend_volatility (r=-0.237, p=1.3e-133) all
+substantial, and trend_min a weaker but real signal (r=-0.122, p=6.4e-36). item_age is statistically
+significant but small (r=-0.074, p=2.8e-14 — again, real given the huge sample but too small to be
+practically meaningful on its own), and embed_similarity shows no real relationship (r=0.001, p=0.92).
+
+ITEM_AGE-LINKED PATTERNS
+Pooled across buckets (n=7,731 for trend-derived features, n=8,251 for latest_pop_value and
+embed_similarity), the strongest item_age relationship by far is with time_since_peak (r=0.648, p≈0 —
+older items' peaks sit much further in the past). trend_max (r=0.262, p=3.8e-121) and trend_min
+(r=-0.254, p=4.9e-114) are both real, moderate relationships in opposite directions, and
+trend_overall_change is a real, weaker relationship (r=0.163, p=5.1e-47). latest_pop_value reaches the
+bar only marginally (r=-0.106, p=4.2e-22). trend_volatility (r=0.057, p=5.4e-7), latest_momentum
+(r=0.044, p=1.0e-4), and embed_similarity (r=0.042, p=1.5e-4) are all statistically significant but too
+small in magnitude to count as real relationships by this document's standard — in each case, a very
+large sample is producing significance out of a practically negligible effect.
+Because latest_pop_value is this group's single dominant outcome predictor in both trend-bearing
+buckets and its item_age relationship is only marginal, that predictor can largely be trusted at face
+value regardless of item age. trend_max and trend_min, which are also meaningful (if secondary) outcome
+predictors, do carry real item_age relationships and should be read with some age-conditioning in mind,
+though the effect is more modest than in the medium_popular / decrease group. time_since_peak's very
+strong item_age link (r=0.648) is a near-mechanical relationship worth noting on its own, independent
+of its secondary role in the outcome relationships above.
+
+ONE-LINE TAKEAWAY
+Latest popularity value is this group's dominant and most age-independent signal once real trend
+history exists, with time_since_peak the standout item_age-linked feature to watch separately given how
+strongly age drives it.
+
+================================================================================
+MEDIUM_POPULAR / STABLE
+================================================================================
+
+GROUP DEFINITION
+Items at medium popularity that stayed flat (n=3,685). Latest popularity value typically 1 (middle 50%:
+1-1; full range 1-5). Item age typically 6 months (middle 50%: 0-15). The trend's low point typically
+sits at 0 (middle 50%: 0-0; up to 5) and its high point typically at 3 (middle 50%: 1-4; up to 110).
+Volatility averages 0.751 (middle 50%: 0.495-1.1; up to 22.9), with a net trend change of 0. The peak
+typically occurred 5 months before the latest observation (middle 50%: 2-10). Momentum typically reads
+0.091 (middle 50%: 0-0.693; full range -2.14 to 1.79), based on 2,562 of the 3,685 items — 1,123 had no
+momentum value due to a single trend point. Historically, items in this group changed by 0 in
+popularity value from their pre-outcome value to the final observed value (middle 50%: 0 to 0; full
+range 0 to 0, i.e. this outcome is essentially defined by no change) — this describes labeled training
+items and is not computable for a new item. None of the 3,685 items were debut items; 1,123 (30%) had
+only a single real trend point.
+
+DATA RELIABILITY NOTE
+This group is large and well-powered (n=3,685), with a solid maturing sub-population (2,160) and
+meaningful recent_multi_point (402) and recent_single_point (1,123) sub-populations. The
+feature-vs-outcome correlations below use the full medium_popular sample sharing each bucket (2,120 /
+2,341 / 10,471), so estimates are reliable throughout, though the recent_multi_point true-member count
+(402) is comparatively the thinnest of the three.
+
+KEY FEATURE-OUTCOME RELATIONSHIPS
+In the single-point bucket, latest_pop_value is the strongest available signal (r=-0.465, p=2.1e-114,
+n=2,120: a lower current value favors this stable outcome), with embed_similarity contributing a much
+smaller but real signal in the opposite direction (r=0.061, p=0.0047).
+In recent_multi_point, the strongest signal shifts to trend-shape features: latest_momentum leads
+(r=0.162, p=3.7e-15, n=2,341), trend_volatility is close behind and negatively signed (r=-0.141,
+p=6.4e-12), latest_pop_value drops to a more moderate role here (r=0.127, p=6.5e-10), and trend_min
+(r=0.083, p=6.4e-5) and trend_overall_change (r=0.077, p=1.8e-4) are weaker but real. trend_max
+(r=-0.060, p=0.0038) and time_since_peak (r=0.046, p=0.028) are weak, marginal signals. item_age
+(r=0.033, p=0.11) and embed_similarity (r=-0.039, p=0.057) show no real relationship in this bucket.
+In maturing, latest_pop_value is again the leading signal (r=0.202, p=3.0e-97, n=10,471), followed by
+latest_momentum (r=0.180, p=6.4e-77) and trend_overall_change (r=0.121, p=2.1e-35) — all moderate.
+trend_min (r=0.033, p=6.5e-4) and time_since_peak (r=0.028, p=0.0046) are weak but real. item_age
+(r=0.013, p=0.17), trend_max (r=0.002, p=0.85), trend_volatility (r=-0.004, p=0.68), and
+embed_similarity (r=0.007, p=0.46) all show no real relationship with the outcome in this bucket.
+
+ITEM_AGE-LINKED PATTERNS
+Pooled across buckets (n=2,562 for trend-derived features, n=3,685 for latest_pop_value and
+embed_similarity), item_age shows several real relationships: the strongest is with time_since_peak
+(r=0.564, p=6.9e-215 — older items' peaks sit further in the past) and trend_min (r=-0.520,
+p=3.6e-177 — older items have a lower trend floor). trend_max (r=0.244, p=3.8e-36), latest_pop_value
+(r=0.192, p=6.0e-32), and trend_overall_change (r=0.192, p=1.3e-22) are all real, moderate
+relationships, and trend_volatility clears the bar too (r=0.141, p=7.2e-13). embed_similarity
+(r=0.037, p=0.024) and latest_momentum (r=0.019, p=0.34) show no real relationship.
+This is notable because latest_pop_value and latest_momentum — this group's two leading outcome
+predictors — sit on opposite sides of the item_age-relevance line: latest_pop_value carries a real,
+moderate age relationship and should be read with age in mind, while latest_momentum (equally or more
+decision-relevant, especially in recent_multi_point) shows no real item_age link at all and can be
+trusted independently of how old the item is. time_since_peak's very strong item_age relationship
+(r=0.564) is again the dominant, near-mechanical pattern in this group's item_age table, though it is
+only a secondary outcome predictor here.
+
+ONE-LINE TAKEAWAY
+Latest popularity value and latest_momentum are this group's leading signals across buckets, but only
+latest_pop_value needs age-conditioning — latest_momentum's relationship with the outcome holds
+independent of item age.
+
+================================================================================
+ZERO_POPULAR / DECREASE
+================================================================================
+
+GROUP DEFINITION
+Items with no popularity that declined further (n=11,484). Latest popularity value typically 1 (middle
+50%: 1-1; full range 1-40). Item age typically 0 months (middle 50%: 0-8). The trend's low point
+typically sits at 0 (middle 50%: 0-0; up to 31) and its high point typically at 2 (middle 50%: 1-3; up
+to 146). Volatility averages 0.643 (middle 50%: 0.471-0.957; up to 45.9), with a net trend change of 0.
+The peak typically occurred 4 months before the latest observation (middle 50%: 1-9). Momentum
+typically reads 0.693 (middle 50%: 0-0.693; full range -2.2 to 2.94), based on 5,519 of the 11,484
+items — 5,965 had no momentum value due to a single trend point (a majority of this group). Historically,
+items in this group changed by -1 in popularity value from their pre-outcome value to the final
+observed value (middle 50%: -1 to -1; full range -40 to -1) — this describes labeled training items and
+is not computable for a new item. None of the 11,484 items were debut items; 5,965 (52%) had only a
+single real trend point — the majority of this group's history is this thin.
+
+DATA RELIABILITY NOTE
+This group is very large overall (n=11,484), but its recent_single_point sub-population (5,965) is
+larger than its recent_multi_point (1,246) and maturing (4,273) sub-populations combined-with-caveat:
+notably, the primary correlation table provided does not include any feature-vs-outcome breakout at all
+for the recent_single_point bucket for this group, despite that bucket holding the majority of the
+group's members. This is a genuine gap in the evidence, not something to infer a pattern from — the
+underlying reason is structural: every zero_popular item with only a single trend point that reached
+either "decrease" or "stable" in this dataset in fact reached "decrease" (5,965 of 5,965; zero_popular /
+stable has no recent_single_point members at all, confirmed in its own group definition below), so there
+is no cross-direction variation left within that bucket for a feature-vs-outcome correlation to measure
+against — the outcome is constant. That composition fact is itself informative even without a
+correlation: for a zero-popularity item with exactly one historical observation, this data shows a
+decline outcome with no counterexample among single-point zero-popularity items, though this should not
+be read as a logical guarantee, only as a strong and completely consistent empirical pattern. For the
+recent_multi_point (n=6,187 in the shared correlation sample) and maturing (n=21,453) buckets, the
+feature-vs-outcome correlations below are well-powered and reliable.
+
+KEY FEATURE-OUTCOME RELATIONSHIPS
+No feature-vs-outcome evidence is available for the recent_single_point bucket for the reason explained
+above.
+In recent_multi_point, latest_pop_value is an extremely strong and dominant signal (r=0.876, p<0.001,
+n=6,187), with trend_overall_change close behind (r=0.504, p<0.001), trend_min strong (r=0.636,
+p<0.001), latest_momentum strong (r=0.423, p=1.6e-267), trend_max moderate (r=0.284, p=2.4e-115), and
+time_since_peak a moderate negative signal (r=-0.254, p=7.4e-92: a more recent peak favors this
+decline). trend_volatility is a weak but real signal (r=0.063, p=6.1e-7), embed_similarity a very weak
+but real signal (r=-0.034, p=0.0070), and item_age reaches significance only marginally (r=-0.026,
+p=0.045, not meeting the stricter p<0.01 bar used elsewhere in this document — treat as borderline at
+best).
+In maturing, latest_pop_value is even more dominant and near-deterministic (r=0.927, p<0.001,
+n=21,453), followed by trend_overall_change (r=0.622, p<0.001) and latest_momentum (r=0.537, p<0.001)
+as strong secondary signals. trend_min is moderate (r=0.151, p=1.6e-109) and time_since_peak a moderate
+negative signal (r=-0.227, p=7.6e-248). trend_max (r=0.041, p=2.2e-9), trend_volatility (r=0.040,
+p=3.9e-9), and embed_similarity (r=-0.021, p=0.0017) are all statistically significant but small enough
+to be practically negligible on their own. item_age is likewise statistically significant but very
+small (r=0.025, p=2.5e-4).
+
+ITEM_AGE-LINKED PATTERNS
+Pooled across the group's non-single-point buckets (n=5,519 for trend-derived features, n=11,484 for
+latest_pop_value and embed_similarity), the strongest item_age relationships are with time_since_peak
+(r=0.530, p≈0 — older items' peaks are further in the past) and trend_min (r=-0.520, p≈0 — older items
+have a lower trend floor). latest_pop_value is a real, moderate relationship (r=0.202, p=8.6e-106),
+trend_overall_change is real and moderate (r=0.162, p=1.3e-33), and latest_momentum is real (r=0.136,
+p=3.8e-24). trend_max reaches significance but is below the magnitude bar (r=0.088, p=6.1e-11 —
+real-but-negligible given the very large sample). trend_volatility (r=0.023, p=0.094) and
+embed_similarity (r=-0.017, p=0.068) show no real relationship.
+Because latest_pop_value and trend_overall_change — both leading outcome predictors here — carry real,
+positive item_age relationships, an older item's typically higher readings on these features should be
+weighed with that in mind rather than treated as fully independent evidence of decline. time_since_peak
+again shows the single strongest item_age relationship in this group's table and is also a solid outcome
+predictor, so this caveat is particularly relevant for that feature: an older item's more distant peak
+is partly just a function of age.
+
+ONE-LINE TAKEAWAY
+Latest popularity value is overwhelmingly the strongest and most reliable feature for this group in
+both buckets where it can be tested, though for single-point items the only usable evidence is the
+group's near-total historical composition toward this decline outcome.
+
+================================================================================
+ZERO_POPULAR / STABLE
+================================================================================
+
+GROUP DEFINITION
+Items with no popularity that stayed at zero (n=22,121) — the largest group in the dataset. Latest
+popularity value is not merely typically but always 0 across this entire group (middle 50%: 0-0; full
+range: 0-0 — a structural constant, not just a common value). Item age typically 8 months (middle 50%:
+4-16). The trend's low point is likewise always 0 (middle 50%: 0-0; full range 0-0), while the high
+point typically reaches 1 (middle 50%: 1-3; up to 164). Volatility averages 0.471 (middle 50%:
+0.389-0.8; up to 39.6), with a net trend change of -1. The peak typically occurred 6 months before the
+latest observation (middle 50%: 3-12). Momentum typically reads 0 (middle 50%: 0-0), and unlike every
+other group, no momentum-unavailable count is reported here, consistent with the composition figures
+below showing this group has no single-point members at all. Historically, items in this group changed
+by 0 in popularity value from their pre-outcome value to the final observed value (middle 50%: 0 to 0;
+full range 0 to 0) — this describes labeled training items and is not computable for a new item. None
+of the 22,121 items were debut items, and none had only a single real trend point — every member of this
+group has real, multi-point trend history.
+
+DATA RELIABILITY NOTE
+This group is by far the largest and best-powered in the dataset (n=22,121), split across
+recent_multi_point (4,941 true members; 6,187 in the shared correlation sample) and maturing (17,180
+true members; 21,453 in the shared correlation sample). There is no recent_single_point bucket for this
+group at all — that is a genuine structural absence (zero members), not a gap in the evidence, and it
+should not be confused with the zero_popular / decrease group's recent_single_point gap, which is a
+missing correlation breakout despite thousands of real members.
+
+KEY FEATURE-OUTCOME RELATIONSHIPS
+Before any correlation is discussed, one structural fact overrides everything else for this group:
+latest_pop_value and the trend's low point (trend_min) are both fixed at exactly 0 for every single
+member of this group, with zero variance across the entire population — not a typical value but a
+deterministic constant. This means neither feature can ever discriminate this group from anything using
+correlation (their correlation with item_age, and effectively with any other variable, is undefined for
+exactly this reason, as confirmed in the item_age-linked patterns below), and any apparent "relationship"
+involving them anywhere in this dataset should be understood as an artifact of this constant, not a
+real signal about this specific group.
+Within that constraint, in recent_multi_point, time_since_peak is the strongest real outcome signal
+(r=0.254, p=7.4e-92, n=6,187 — a peak further in the past favors this stable outcome), with
+latest_momentum a strong signal in the opposite direction (r=-0.423, p=1.6e-267), trend_overall_change
+strong (r=-0.504, p<0.001), trend_max moderate (r=-0.284, p=2.4e-115), and trend_volatility a weak but
+real signal (r=-0.063, p=6.1e-7). embed_similarity is a very weak but real signal (r=0.034, p=0.0070),
+and item_age is only marginally significant (r=0.026, p=0.045, not meeting this document's p<0.01 bar).
+In maturing, latest_momentum is the strongest real signal (r=-0.537, p<0.001, n=21,453), followed by
+trend_overall_change (r=-0.622, p<0.001) — actually the larger of the two in magnitude — and
+time_since_peak (r=0.227, p=7.6e-248). trend_max (r=-0.041, p=2.2e-9), trend_volatility (r=-0.040,
+p=3.9e-9), and embed_similarity (r=0.021, p=0.0017) are statistically significant but small enough to
+be practically negligible. item_age is likewise statistically significant but very small (r=-0.025,
+p=2.5e-4).
+
+ITEM_AGE-LINKED PATTERNS
+Pooled across the group's buckets (n=6,187 for trend-derived features, n=22,121 for
+embed_similarity), item_age has by far its strongest relationship anywhere in this dataset with
+time_since_peak (r=0.822, p≈0 — a near-dominant relationship in which older items have peaks much
+further in the past). trend_max is a real, moderate relationship (r=0.275, p≈0), and latest_momentum is
+also real (r=0.208, p=1.1e-215). trend_volatility (r=0.031, p=4.2e-6) and trend_overall_change
+(r=-0.025, p=2.5e-4) are statistically significant but too small to count as real relationships, and
+embed_similarity shows none (r=-0.003, p=0.63). latest_pop_value and trend_min both return an undefined
+(NaN) correlation with item_age — not because of missing data, but because, as noted above, both
+features are fixed constants across every member of this group and therefore have no variance for
+item_age to correlate against.
+Because time_since_peak is both this group's item_age relationship of overwhelming magnitude (r=0.822)
+and a real, meaningful outcome predictor in both buckets, this is the single most important
+age-conditioning caveat in the entire dataset for this group: a substantial share of what makes
+time_since_peak predictive here is mechanically tied to how old the item is, and that should be kept
+in mind whenever time_since_peak is used for this group. latest_momentum and trend_max, both also real
+outcome predictors, carry real but more modest item_age relationships and warrant lighter versions of
+the same caveat.
+
+ONE-LINE TAKEAWAY
+latest_momentum and trend_overall_change are this group's strongest genuine outcome signals, but
+time_since_peak — despite being a real predictor too — should be interpreted cautiously given how
+overwhelmingly it is driven by item age in this group specifically.
+
+================================================================================
+DEBUT ITEMS: A STRUCTURALLY SEPARATE POPULATION (spans multiple groups)
+================================================================================
+
+WHY THIS IS HANDLED SEPARATELY
+Debut items — items with item_age fixed at exactly -1, meaning no historical trend point exists for
+them at all — cannot be analyzed with the standard per-group, per-bucket breakdown used above. Every
+trend-derived feature (trend_min, trend_max, trend_volatility, trend_overall_change, time_since_peak,
+latest_momentum) is undefined by definition for a debut item, not merely weak or untested, and item_age
+itself is a fixed constant (-1) for every debut item, so it has zero variance within this population and
+cannot be correlated against anything. This is confirmed directly in the data: the one correlation test
+available across all debut items in the source material — item_age against embed_similarity — returns
+an undefined (NaN) result (n=8,633), precisely because item_age cannot vary within this population.
+embed_similarity itself is presumably still computable for a debut item, since it does not depend on
+trend history, but no evidence was supplied testing its relationship to the outcome for debut items
+specifically, so no claim is made about it here.
+
+COMPOSITION AND REACHABLE OUTCOMES
+Across the entire dataset, debut items appear as members of exactly two of the eight groups covered
+above: high_popular / increase (460 debut items, 30% of that group's 1,510 total members) and
+medium_popular / increase (8,173 debut items, fully half of that group's 16,424 total members). Every
+other group examined in this document — high_popular / decrease, high_popular / stable, medium_popular /
+decrease, medium_popular / stable, zero_popular / decrease, and zero_popular / stable — explicitly
+reports zero debut members, with no exceptions, across a combined population of well over 40,000
+non-debut items in those six groups. In other words, in every case observed in this data, a debut item
+that reached a labeled outcome reached an "increase" outcome, and never a "decrease" or "stable"
+outcome.
+This pattern is also consistent with a structural, not merely empirical, explanation: "decrease" and
+"stable" are both defined relative to a prior observed value that the item must already have, and a
+debut item has no prior value to decrease from or stay stable relative to — only "increase," read as
+emerging from a null baseline, is coherent for an item with no history yet. Given both the complete
+absence of any counterexample in the data and this structural reasoning, decrease and stable outcomes
+should be treated as effectively unreachable for a debut query item, while increase (specifically within
+either the high_popular or medium_popular clusters, since no debut members were reported in the
+zero_popular clusters in this evidence either) is the only outcome category debut items were ever
+observed to reach.
+
+ONE-LINE TAKEAWAY
+For a debut query item with no trend history at all, no trend-derived feature can be computed or should
+be requested; the only usable evidence is that, historically, every such item that reached a labeled
+outcome reached an increase outcome, never a decrease or stable one.
+
+================================================================================
+PAIRWISE DISCRIMINATION: GROUPS COMMONLY CONFUSED WITH ONE ANOTHER
+================================================================================
+
+MEDIUM_POPULAR / INCREASE vs. ZERO_POPULAR / STABLE
+This comparison has no evidence for the debut or recent_single_point buckets: zero_popular / stable has
+no debut members and no recent_single_point members at all, so those buckets cannot be compared.
+In recent_multi_point (n=6,407), latest_pop_value is overwhelmingly the strongest separator between
+these two groups (r=-0.420, p<0.001 — higher values favor zero_popular / stable, lower values favor
+medium_popular / increase), followed by trend_min (r=-0.354, p<0.001, same direction). trend_max
+(r=-0.115, p<0.001) and trend_overall_change (r=-0.112, p<0.001) are real but much weaker separators in
+the same direction, and time_since_peak is a real, weaker separator in the opposite direction (r=0.073,
+p<0.001, favoring zero_popular / stable when the peak is more recent — a modest effect but worth noting
+given the very large sample). trend_volatility (r=-0.037, p=0.0034) and latest_momentum (r=-0.027,
+p=0.030) are statistically significant but small enough to be weak, marginal separators at best;
+embed_similarity (r=0.026, p=0.036) is similarly marginal. item_age does not separate these two groups
+at all in this bucket (r=-0.013, p=0.32).
+In maturing (n=23,445), the ranking shifts: latest_pop_value remains the strongest separator (r=-0.469,
+p<0.001), but trend_overall_change is now the clear second-strongest (r=-0.268, p<0.001), well ahead
+of time_since_peak (r=0.132, p<0.001) and trend_min (r=-0.130, p<0.001). latest_momentum is a real,
+moderate separator (r=0.091, p<0.001), and item_age itself becomes a real, if modest, separator in this
+bucket (r=-0.063, p<0.001 — older items favor medium_popular / increase somewhat over zero_popular /
+stable). trend_max (r=-0.060, p<0.001) and trend_volatility (r=-0.047, p<0.001) are real but weak, and
+embed_similarity (r=0.020, p=0.0022) is a very weak but real separator.
+Cross-referencing against each group's own strongest general predictors: latest_pop_value is both
+groups' single strongest general outcome predictor and also this pair's strongest discriminator in both
+buckets, so it transfers cleanly here. trend_overall_change, however, is worth flagging specifically —
+it is a much stronger general predictor within medium_popular / increase's own maturing bucket
+(r=-0.581 against that group's outcome) than its discriminating power against zero_popular / stable
+specifically would suggest at first glance, but here its separating power (r=-0.268) is still
+substantial, so it remains a reasonable second-line feature for this particular pair. By contrast,
+latest_momentum, a strong general predictor for medium_popular / increase (r as strong as -0.456 in
+maturing), is a comparatively weak discriminator for this specific pair in the same bucket (r=0.091) —
+useful, but not a feature to default to as the primary way of separating these two candidates.
+This pairwise sample is very well-powered (over 6,000 items in the smaller bucket, over 23,000 in the
+larger), so these comparisons can be trusted at face value without a small-sample caveat.
+
+One-line takeaway: latest_pop_value should decide between these two candidates whenever both are live —
+higher values point to zero_popular / stable, lower values to medium_popular / increase — with
+trend_min or trend_overall_change (depending on bucket) as the best secondary check.
+
+MEDIUM_POPULAR / STABLE vs. ZERO_POPULAR / DECREASE
+This comparison has no evidence for the debut bucket (neither group has debut members), but unlike the
+prior pair, it does have recent_single_point evidence, since both groups have substantial
+recent_single_point membership.
+In recent_single_point (n=7,088), essentially no feature separates these two groups reliably: only
+embed_similarity approaches significance and falls just short (r=0.021, p=0.075, not significant), and
+latest_pop_value is not a real separator either (r=0.004, p=0.72). item_age and every trend-derived
+feature are structurally undefined in this bucket for both groups (zero real trend history on either
+side), so there is effectively no usable evidence to distinguish these two candidates from single-point
+history alone — this should be reported plainly as a gap rather than implied to have a weak-but-real
+answer.
+In recent_multi_point (n=1,648 — noticeably smaller than the other buckets in this document, so these
+estimates should be treated with more caution than most), latest_pop_value is the strongest separator
+(r=0.145, p<0.001 — higher values favor zero_popular / decrease), with trend_volatility (r=0.070,
+p=0.0047), trend_max (r=0.065, p=0.0084), trend_overall_change (r=0.061, p=0.0135), trend_min (r=0.053,
+p=0.032), and latest_momentum (r=0.053, p=0.033) all real but weak separators in the same direction, and
+time_since_peak a real, weak separator in the opposite direction (r=-0.057, p=0.020, favoring
+medium_popular / stable when the peak is more recent). item_age (r=-0.046, p=0.060) and embed_similarity
+(r=0.033, p=0.176) do not reach significance in this bucket.
+In maturing (n=6,433), latest_momentum is the clear strongest separator (r=0.202, p<0.001 — higher
+momentum favors zero_popular / decrease), followed by trend_max (r=-0.137, p<0.001) and
+trend_volatility (r=-0.103, p<0.001) in the opposite direction, item_age a real, weak separator
+(r=-0.079, p<0.001), trend_min (r=-0.072, p<0.001), trend_overall_change (r=0.049, p=0.0001), and
+time_since_peak (r=-0.041, p=0.0011) all real but weak, and latest_pop_value a real but weak separator
+here too (r=0.037, p=0.0027). embed_similarity is not a real separator (r=-0.010, p=0.42).
+Cross-referencing against each group's own strongest general predictors: latest_pop_value is by far the
+strongest general outcome predictor for both groups individually (as high as r=0.876 for zero_popular /
+decrease in its own recent_multi_point bucket, and comparably strong for medium_popular / stable's own
+single-point bucket), yet it is one of the weakest available discriminators for this specific pair
+across every bucket where it can be tested (r no higher than 0.145) — a strong general predictor that
+does not usefully separate these two particular candidates. The features that do separate them best
+shift by bucket: trend_volatility and trend_max lead in recent_multi_point, while latest_momentum and
+trend_max lead in maturing.
+This pair's recent_multi_point evidence, at n=1,648, is the thinnest bucket-level sample among the three
+supplied pairs and should be flagged accordingly — its correlations, while statistically significant,
+rest on a comparatively small overlap between the two groups.
+
+One-line takeaway: for single-point items this pair cannot be resolved with the available features at
+all; once real trend history exists, latest_momentum (in the maturing bucket) or trend_volatility and
+trend_max (in the earlier bucket) should decide between these two candidates rather than latest_pop_value,
+which despite being each group's strongest predictor individually barely separates them from each other.
+
+HIGH_POPULAR / INCREASE vs. MEDIUM_POPULAR / DECREASE
+This comparison has no evidence for the debut bucket, since medium_popular / decrease has zero debut
+members (even though high_popular / increase itself has 460).
+In recent_single_point (n=873), latest_pop_value is a real, weak-to-moderate separator (r=0.113,
+p=0.0009 — higher values favor medium_popular / decrease), and embed_similarity is a real, weak
+separator in the opposite direction (r=-0.101, p=0.0029, favoring high_popular / increase). item_age and
+every trend-derived feature are structurally undefined for both groups in this bucket.
+In recent_multi_point (n=599), latest_pop_value is the strongest separator by a clear margin (r=0.294,
+p<0.001), followed by trend_min (r=0.242, p<0.001) and trend_max (r=0.194, p<0.001), all favoring
+medium_popular / decrease at higher values. time_since_peak is a real, moderate separator in the
+opposite direction (r=-0.157, p=0.0001), and embed_similarity (r=0.095, p=0.020) and trend_volatility
+(r=0.092, p=0.025) are real but weak. latest_momentum (r=0.072, p=0.080), item_age (r=-0.062, p=0.128),
+and trend_overall_change (r=0.034, p=0.411) do not reach significance in this bucket.
+In maturing (n=2,574), latest_momentum is the strongest separator (r=0.250, p<0.001 — higher momentum
+favors medium_popular / decrease), with trend_max (r=-0.186, p<0.001), trend_volatility (r=-0.182,
+p<0.001), and trend_min (r=-0.166, p<0.001) all real and moderate in the opposite direction, and
+time_since_peak (r=-0.104, p<0.001) and trend_overall_change (r=0.089, p<0.001) real but weaker.
+item_age is a real, weak separator here too (r=0.042, p=0.031, favoring medium_popular / decrease at
+higher ages). latest_pop_value (r=0.035, p=0.074) and embed_similarity (r=-0.010, p=0.63) are not real
+separators in this bucket — notably, this is the one bucket in this pairwise comparison where
+latest_pop_value fails to separate the two groups at all.
+Cross-referencing against each group's own strongest general predictors: latest_pop_value is each
+group's own leading outcome predictor overall, and it does carry real separating power for this pair in
+recent_single_point and recent_multi_point, but that power disappears entirely in the maturing bucket
+(r=0.035, not significant) — for a mature query item being weighed between these two specific
+candidates, latest_pop_value should not be relied on, and latest_momentum should be used instead, since
+it is both a strong general predictor for medium_popular / decrease and this pair's strongest
+maturing-bucket discriminator.
+The recent_multi_point bucket here (n=599) and especially the maturing bucket relative to the other two
+supplied pairs are moderately sized rather than large; the recent_single_point bucket (n=873) and
+maturing bucket (n=2,574) are reasonably powered, but all three are noticeably smaller than the
+comparable buckets in the first two pairs above and should be read with slightly more caution as a
+result.
+
+One-line takeaway: use latest_pop_value or trend_min/trend_max to separate these two candidates for
+items with little or no trend history, but switch to latest_momentum for mature items, since
+latest_pop_value's discriminating power disappears entirely once an item has substantial trend history.
+
+===============================================================================
+USER TURN TEMPLATE (dynamic -- fill in per query item, one per call)
+===============================================================================
+This is the only part that should change between requests. Provide the
+query item's own feature values, using the definitions above:
+
+history_depth_bucket: <recent_single_point | recent_multi_point | maturing>
+latest_pop_value: <value>
+item_age: <value>
+trend_array (oldest to most recent, up to t-1): <value>
+trend_min: <value, or "undefined -- single point">
+trend_max: <value, or "undefined -- single point">
+trend_volatility: <value, or "unknown -- fewer than 2 points">
+trend_overall_change: <value, or "unknown -- fewer than 2 points">
+time_since_peak: <value, or "0 -- single point">
+latest_momentum: <value, or "unknown -- fewer than 2 points">
+embed_similarity: <value>
+
+Select the features for this item per the rules and output format defined
+in the system prompt above.

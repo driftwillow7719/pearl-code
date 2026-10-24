@@ -1,0 +1,45 @@
+<TASK>
+You are an experienced product popularity analyst. Given a product's static attributes in <PRODUCT_METADATA>, its temporal information in <HISTORICAL_TREND>, and a known outcome in <PREDICTION_TARGET>, identify the key explanatory factors from <PRODUCT_METADATA> and <HISTORICAL_TREND> that best account for the popularity_score at the selected popularity_month in <PREDICTION_TARGET>.
+
+Your goal is to reason from the available evidence toward the known outcome — explaining which factors most plausibly drove that result.
+
+Only use facts explicitly present in <PRODUCT_METADATA> and <HISTORICAL_TREND> as evidence. Do not infer information not present in the provided context.
+</TASK>
+
+<THINKING_STEPS>
+Complete all steps internally before writing your answer:
+1. Summarize the product profile from <PRODUCT_METADATA>.
+2. Evaluate the temporal information in <HISTORICAL_TREND>:
+   - t denotes popularity_month — the specific month in <PREDICTION_TARGET> whose popularity_score is the known outcome to be explained. t-1 refers to the most recent available month in <HISTORICAL_TREND>, immediately preceding t.
+   - If months_of_history_available is 0 (popularity_trajectory is "No historical trend"), there is no lifecycle evidence for this product — skip the rest of step 2 and step 3.
+   - months_of_history_available indicates how many months of prior popularity data are available for this product, counted from its release month up to (but not including) the popularity_month being predicted.
+   - popularity_trajectory lists monthly popularity scores from release_month to the latest available month (YYYY-MM: score). Use it only to characterize the overall shape — e.g. first emergence from zero, sustained growth, sharp decline, prolonged flatness — not to look up individual values.
+   - latest_pop_value is the precomputed popularity score for the most recent available month (the same month as the end of popularity_trajectory). Use this value directly rather than re-reading it off popularity_trajectory.
+   - latest_momentum is the precomputed log-scale change (capped to between -3 to 3) from the second-most-recent available month to the most-recent available month (t-1). A positive value means popularity was rising into t-1, negative means falling into t-1, near zero means flat. latest_momentum may be 'unavailable' when fewer than two months of prior trend data exist (e.g., a product near its release month) — this is expected, not an error, and should not be cited as a factor on its own.
+3. Compare latest_pop_value with the popularity_score in <PREDICTION_TARGET> to determine the actual direction — increasing, decreasing, or stable — going into popularity_month; this comparison alone is authoritative. latest_momentum only describes the trend's shape leading into t-1 and does not itself determine the outcome direction — note whether it aligns with or diverges from the actual direction, as either relationship can be explanatory. Skip this step if there is no historical trend (see step 2).
+4. Judge the magnitude of popularity_score in <PREDICTION_TARGET>, following this condition:
+   - if it's 0, then it's unpopular.
+   - if it's between 1 and 2 (inclusive), then it's low popularity.
+   - if it's 3 or greater, then it's highly popular.
+   These magnitude thresholds are for internal calibration only; do not restate the category label, or reference the scale, thresholds, or ranges directly, in the output text.
+5. Draw from your findings in steps 1 and/or 2–3 to identify the independent or combined factors that most plausibly account for the direction (step 3, if available) and magnitude (step 4) of the outcome.
+   - If there is no historical trend (see step 2), draw your findings from <PRODUCT_METADATA> only. If <PRODUCT_METADATA> does not clearly explain the outcome, tag the relevant factor(s) as Neutral rather than inventing a Negative reason — never cite the absence of historical trend data itself as part of a bullet's reasoning, even under a Metadata tag.
+</THINKING_STEPS>
+
+<ANSWER_FORMAT>
+1. Keep your answer at most 250 words.
+2. Output using this exact format:
+
+EXPLANATORY FACTORS:
+- [Domain - Specific_Category - Impact]: one sentence grounded in the provided context that explains how this factor accounts for the popularity outcome (popularity_score) at the popularity_month.
+
+Where:
+- Domain = "Lifecycle" (trend-based) OR "Metadata" (static attributes)
+- Specific_Category = a concise 3–5 word phrase describing the observed pattern or factor.
+- Impact = "Positive" (this factor itself tends to increase popularity) OR "Negative" (this factor itself tends to decrease popularity) OR "Neutral" (no clear directional effect)
+
+Rules:
+- 1 to 3 bullet points only: this is a maximum, not a target; output fewer bullets rather than padding with weak or forbidden content to reach 3.
+- Unavailable data do not qualify as explanatory factors. Never cite the absence or unavailability of historical trend data as part of a bullet's reasoning, under any Domain tag — not only when it is the bullet's sole content. If there is no historical trend, base all bullets on <PRODUCT_METADATA> (Domain = 'Metadata') instead.
+- Be objective and avoid redundant explanations.
+</ANSWER_FORMAT>
