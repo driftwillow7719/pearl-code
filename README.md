@@ -37,7 +37,7 @@ for its arguments (script numbers `sN_...` are not contiguous).
 
 | Framework component | Step | Code |
 |---|---|---|
-| **1. Experience Construction** | Data Construction | `01_preprocessing/` (train/test sets per dataset); `02_explanation_and_embedding/01_explanation_generation/` (LLM explanatory factors, prompts in `system_prompts/`); `02_.../02_embedding_generation/` (item embeddings) |
+| **1. Experience Construction** | Data Construction | `01_preprocessing/` (train/test sets per dataset); `02_explanation_and_embedding/01_explanation_generation/` (LLM hindsight factors, prompts in `system_prompts/`); `02_.../02_embedding_generation/` (item embeddings) |
 | | Grouping and Profiling | `03_clustering_and_indexing/`: `s5_save_eight_groups.py` (outcome groups and their profiles), `s6`-`s8` (correlation studies) |
 | **2. Experience Retrieval** | Outcome Group Selection (top-1 most similar group) | `04_data_analyst_feature_selection/` (data-analyst summary, feature selector prompts and batches); `05_retrieval_and_formatting/s14_retrieve_top1_centers.py` |
 | | Within-group Case Retrieval (and item formatting) | `03_clustering_and_indexing/s16_indexing.py` (scored member index); `05_retrieval_and_formatting/s17_...py` (top-K retrieval, prefilter + reranking, card formatting) |
@@ -52,7 +52,7 @@ with `s13_merging_api_calls.py`. `s12_batch_pipeline.py` parses each reply as JS
 `s12_batch_exp_pipeline.py` keeps the free-text reply as `explanatory_factors`. `submit` stores `<tag>_batch_meta.json` in the
 current directory, so run `submit`, `status` and `download` from the same directory with the same `--tag`.
 
-1. **Explanatory factors.** `02_.../01_explanation_generation/s4_prepare_batch_input.py` writes `<dataset>_full_data.jsonl` and
+1. **Hindsight factors (labelled as explanatory_factors).** `02_.../01_explanation_generation/s4_prepare_batch_input.py` writes `<dataset>_full_data.jsonl` and
    `<dataset>_mapping_full_data.csv`. Run it with `s12_batch_exp_pipeline.py` (`submit`, `status`, `download`), then
    `s13_merging_api_calls.py --mapping <dataset>_mapping_full_data.csv --results <downloaded csv> --output <train csv with explanatory_factors>`.
 2. **Feature selection.** `04_.../s11_feature_slx_prep_batch.py` writes `<tag>_batch.jsonl` and a feature-selection mapping CSV. Run it with
@@ -75,7 +75,7 @@ of `s14_retrieve_top1_centers.py`. The retrieved context is then fed to the pred
 
 Defaults (the full framework, G1E1): `--group-routing scored --item-selection rerank --bucket-match on --alpha-embed 0.5
 --beta-secondary 0.5 --k-values 5,10 --e-variants E1 --g-tag G1`. Every row below changes only the flags listed.
-"+ factors" means `E1` (explanatory factors included); `E0` removes them.
+"+ factors" means `E1` (factors included); `E0` removes them.
 
 | Paper row | What is ablated | How to run |
 |---|---|---|
@@ -108,7 +108,7 @@ python3 s17_retrieved_item_formatting_component_ablation.py --dataset baby \
 | Trend | `s17 --ablate-component trend` |
 | Item name (and release date) | `s17 --ablate-component item_name` |
 | Relative change | `s17 --ablate-component relative_change` |
-| Explanatory factors | `s17 --e-variants E0` (G1E0) |
+| Hindsight factors | `s17 --e-variants E0` (G1E0) |
 
 Output files of the `--ablate-component` runs get a `_noTrend` / `_noItemName` / `_noRelChange` suffix.
 
