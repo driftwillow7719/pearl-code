@@ -143,7 +143,7 @@ Evaluation uses the same scripts as the other experiments (`06_prediction_and_ev
 | Explanatory-factor generation (`02_.../01_explanation_generation/s4_prepare_batch_input.py`) | `gpt-5.6-luna` (OpenAI API, `reasoning_effort="none"`), T=0.1 |
 | Feature selection (`04_data_analyst_feature_selection/s11_feature_slx_prep_batch.py`) | `gpt-5.6-luna` (same settings), T = 0 |
 | Embeddings (`02_.../02_embedding_generation/`) | `microsoft/harrier-oss-v1-270m` |
-| Popularity prediction | `gpt-4o-mini-2024-07-18` (default), plus Llama-3-8B, Qwen2-7B (vLLM) and DeepSeek for comparison, T = 0.1 except DeepSeek 0.05 |
+| Popularity prediction | `gpt-4o-mini-2024-07-18` (default), plus Llama-3-8B-Instruct, Qwen2-7B-Instruct (served with vLLM; `--model` is the served model name) and DeepSeek-V4.1-Flash for comparison, T = 0.1 except DeepSeek-V4.1-Flash 0.05 |
 
 ## Data
 
