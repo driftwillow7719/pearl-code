@@ -151,6 +151,22 @@ Scripts read and write CSV/NPY files using relative paths (e.g. `raw_dataset/`, 
 `processed_results/`). Place the datasets there, or edit the paths at the top of each script.
 Douban and Amazon datasets must be obtained from their original sources.
 
+## Artifacts
+
+`artifacts/group_profiles/` holds the intermediate outputs of the grouping and profiling step for each dataset (Douban, Amazon Baby,
+Amazon Home & Kitchen), so the groups and statistics the retrieval and prompts rely on can be inspected without the raw data.
+The folder names start with the date the run was made. They contain derived summaries only, no raw item text or reviews.
+
+| File | Contents | Produced by |
+|---|---|---|
+| `group_profiles.json` | statistics and narration of each outcome group and history-depth bucket | `03_.../s5_save_eight_groups.py` |
+| `group_narrations_for_prompt.json` / `.txt` | the per-group narrations that are inserted into the prompts | `s5_save_eight_groups.py` |
+| `group_mean_embeds.npz` | mean embedding of each group and bucket | `s5_save_eight_groups.py` |
+| `group_doc_ids.npz` | internal item indices (not original item ids) belonging to each group and bucket | `s5_save_eight_groups.py` |
+| `*_group_scored_members.json` | members of each group scored against their group center, sorted | `03_.../s16_indexing.py` |
+| `stats.txt`, `notes.txt` | group and bucket counts | `s5_save_eight_groups.py` |
+| `corr_data/` | age-stratified correlation outputs, bucket composition, item-age correlation study, pairwise separability | `03_.../s6`, `s7`, `s8` |
+
 ## Notes
 
 - Douban timestamps are interpreted in UTC+8; keep this fixed to reproduce the reported numbers.
