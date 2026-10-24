@@ -1,0 +1,33 @@
+                   group              bucket  n_cell_items    is_fallback
+  high_popular__decrease               debut             0 n/a (no items)
+  high_popular__decrease recent_single_point           347          False
+  high_popular__decrease  recent_multi_point           146          False
+  high_popular__decrease            maturing            72          False
+  high_popular__increase               debut           810          False
+  high_popular__increase recent_single_point           169          False
+  high_popular__increase  recent_multi_point           129          False
+  high_popular__increase            maturing            73          False
+    high_popular__stable               debut             0 n/a (no items)
+    high_popular__stable recent_single_point             2           True
+    high_popular__stable  recent_multi_point             6           True
+    high_popular__stable            maturing             5           True
+medium_popular__decrease               debut             0 n/a (no items)
+medium_popular__decrease recent_single_point           625          False
+medium_popular__decrease  recent_multi_point           675          False
+medium_popular__decrease            maturing          1324          False
+medium_popular__increase               debut          1307          False
+medium_popular__increase recent_single_point           677          False
+medium_popular__increase  recent_multi_point           776          False
+medium_popular__increase            maturing          2785          False
+  medium_popular__stable               debut             0 n/a (no items)
+  medium_popular__stable recent_single_point           159          False
+  medium_popular__stable  recent_multi_point           203          False
+  medium_popular__stable            maturing           833          False
+  zero_popular__decrease               debut             0 n/a (no items)
+  zero_popular__decrease recent_single_point           610          False
+  zero_popular__decrease  recent_multi_point           538          False
+  zero_popular__decrease            maturing          2229          False
+    zero_popular__stable               debut          2983          False
+    zero_popular__stable recent_single_point          2489          False
+    zero_popular__stable  recent_multi_point          2631          False
+    zero_popular__stable            maturing         11864          False

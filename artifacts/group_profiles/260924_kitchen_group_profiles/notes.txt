@@ -1,0 +1,56 @@
+pop_cluster counts:
+pop_cluster
+zero_popular      33605
+medium_popular    23105
+high_popular       1931
+Name: count, dtype: int64
+
+pop_direction counts:
+pop_direction
+stable      25865
+increase    17934
+decrease    14842
+Name: count, dtype: int64
+
+history_depth_bucket counts:
+history_depth_bucket
+maturing               32655
+recent_multi_point      8720
+debut                   8633
+recent_single_point     8633
+Name: count, dtype: int64
+                   group              bucket  n_cell_items    is_fallback
+  high_popular__decrease               debut             0 n/a (no items)
+  high_popular__decrease recent_single_point           135          False
+  high_popular__decrease  recent_multi_point            61          False
+  high_popular__decrease            maturing           166          False
+  high_popular__increase               debut           460          False
+  high_popular__increase recent_single_point           396          False
+  high_popular__increase  recent_multi_point           126          False
+  high_popular__increase            maturing           528          False
+    high_popular__stable               debut             0 n/a (no items)
+    high_popular__stable recent_single_point            17          False
+    high_popular__stable  recent_multi_point             5           True
+    high_popular__stable            maturing            37          False
+medium_popular__decrease               debut             0 n/a (no items)
+medium_popular__decrease recent_single_point           477          False
+medium_popular__decrease  recent_multi_point           473          False
+medium_popular__decrease            maturing          2046          False
+medium_popular__increase               debut          8173          False
+medium_popular__increase recent_single_point           520          False
+medium_popular__increase  recent_multi_point          1466          False
+medium_popular__increase            maturing          6265          False
+  medium_popular__stable               debut             0 n/a (no items)
+  medium_popular__stable recent_single_point          1123          False
+  medium_popular__stable  recent_multi_point           402          False
+  medium_popular__stable            maturing          2160          False
+  zero_popular__decrease               debut             0 n/a (no items)
+  zero_popular__decrease recent_single_point          5965          False
+  zero_popular__decrease  recent_multi_point          1246          False
+  zero_popular__decrease            maturing          4273          False
+    zero_popular__stable               debut             0 n/a (no items)
+    zero_popular__stable recent_single_point             0 n/a (no items)
+    zero_popular__stable  recent_multi_point          4941          False
+    zero_popular__stable            maturing         17180          False
+Saved 8 group profiles to 260924_kitchen_group_profiles/group_profiles.json, 260924_kitchen_group_profiles/group_mean_embeds.npz (33 vectors), 260924_kitchen_group_profiles/group_doc_ids.npz.
+Saved 8 group narrations (each with bucket sub-sections) to 260924_kitchen_group_profiles/group_narrations_for_prompt.json and .txt (prompt-ready).

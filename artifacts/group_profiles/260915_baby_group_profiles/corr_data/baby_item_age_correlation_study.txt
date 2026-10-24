@@ -1,0 +1,65 @@
+   pop_cluster direction              feature         r       p_value     n    abs_r
+  high_popular  decrease            trend_min -0.690485  1.246015e-33   228 0.690485
+  high_popular  decrease      time_since_peak  0.526335  1.199432e-17   228 0.526335
+  high_popular  decrease      latest_momentum -0.315554  1.153879e-06   228 0.315554
+  high_popular  decrease     trend_volatility -0.301477  3.560871e-06   228 0.301477
+  high_popular  decrease     latest_pop_value -0.216598  4.355398e-04   260 0.216598
+  high_popular  decrease            trend_max -0.141225  3.305462e-02   228 0.141225
+  high_popular  decrease     embed_similarity -0.095873  1.230725e-01   260 0.095873
+  high_popular  decrease trend_overall_change -0.070347  2.901993e-01   228 0.070347
+  high_popular  increase      time_since_peak  0.529186  8.174175e-69   938 0.529186
+  high_popular  increase            trend_min -0.469546  1.317791e-52   938 0.469546
+  high_popular  increase            trend_max  0.335640  3.927723e-26   938 0.335640
+  high_popular  increase     trend_volatility  0.221929  6.250694e-12   938 0.221929
+  high_popular  increase trend_overall_change  0.166682  2.835338e-07   938 0.166682
+  high_popular  increase     latest_pop_value -0.081701  4.491118e-03  1208 0.081701
+  high_popular  increase      latest_momentum -0.077856  1.708323e-02   938 0.077856
+  high_popular  increase     embed_similarity -0.045076  1.173834e-01  1208 0.045076
+  high_popular    stable            trend_min -0.651849  1.825080e-16   125 0.651849
+  high_popular    stable      time_since_peak  0.505430  1.836468e-09   125 0.505430
+  high_popular    stable trend_overall_change  0.221090  1.322043e-02   125 0.221090
+  high_popular    stable            trend_max  0.138102  1.245675e-01   125 0.138102
+  high_popular    stable     embed_similarity -0.125467  1.382240e-01   141 0.125467
+  high_popular    stable     latest_pop_value  0.116533  1.687815e-01   141 0.116533
+  high_popular    stable      latest_momentum -0.088998  3.236479e-01   125 0.088998
+  high_popular    stable     trend_volatility -0.052386  5.617775e-01   125 0.052386
+medium_popular  decrease            trend_min -0.599265  1.199785e-94   960 0.599265
+medium_popular  decrease      time_since_peak  0.513422  1.112610e-65   960 0.513422
+medium_popular  decrease trend_overall_change  0.151436  2.438960e-06   960 0.151436
+medium_popular  decrease            trend_max  0.062308  5.362058e-02   960 0.062308
+medium_popular  decrease     latest_pop_value  0.049573  8.886510e-02  1179 0.049573
+medium_popular  decrease     trend_volatility -0.021283  5.101151e-01   960 0.021283
+medium_popular  decrease     embed_similarity -0.014805  6.115591e-01  1179 0.014805
+medium_popular  decrease      latest_momentum -0.010653  7.416755e-01   960 0.010653
+medium_popular  increase      time_since_peak  0.786246  0.000000e+00  4845 0.786246
+medium_popular  increase            trend_max  0.283178  5.027983e-90  4845 0.283178
+medium_popular  increase     latest_pop_value -0.181298  2.747732e-38  5011 0.181298
+medium_popular  increase            trend_min -0.137618  6.430673e-22  4845 0.137618
+medium_popular  increase      latest_momentum  0.103869  4.240042e-13  4845 0.103869
+medium_popular  increase trend_overall_change  0.060681  2.372614e-05  4845 0.060681
+medium_popular  increase     trend_volatility  0.036395  1.129207e-02  4845 0.036395
+medium_popular  increase     embed_similarity  0.013694  3.324664e-01  5011 0.013694
+medium_popular    stable      time_since_peak  0.660319 6.475477e-219  1744 0.660319
+medium_popular    stable            trend_min -0.549143 6.010022e-138  1744 0.549143
+medium_popular    stable            trend_max  0.270873  1.047305e-30  1744 0.270873
+medium_popular    stable     trend_volatility  0.265572  1.540379e-29  1744 0.265572
+medium_popular    stable     latest_pop_value  0.137427  1.393046e-12  2635 0.137427
+medium_popular    stable trend_overall_change  0.128368  7.480134e-08  1744 0.128368
+medium_popular    stable      latest_momentum  0.052200  2.926680e-02  1744 0.052200
+medium_popular    stable     embed_similarity  0.016964  3.840496e-01  2635 0.016964
+  zero_popular  decrease      time_since_peak  0.617191  0.000000e+00  4494 0.617191
+  zero_popular  decrease            trend_min -0.517599 1.498097e-306  4494 0.517599
+  zero_popular  decrease            trend_max  0.179717  6.218431e-34  4494 0.179717
+  zero_popular  decrease     latest_pop_value  0.159433  5.627441e-53  9118 0.159433
+  zero_popular  decrease     trend_volatility  0.150679  3.104149e-24  4494 0.150679
+  zero_popular  decrease      latest_momentum  0.129290  3.279331e-18  4494 0.129290
+  zero_popular  decrease trend_overall_change  0.082879  2.636536e-08  4494 0.082879
+  zero_popular  decrease     embed_similarity -0.015114  1.489817e-01  9118 0.015114
+  zero_popular    stable      time_since_peak  0.894756  0.000000e+00 16322 0.894756
+  zero_popular    stable            trend_max  0.268226 5.855050e-267 16322 0.268226
+  zero_popular    stable      latest_momentum  0.233340 1.050306e-200 16322 0.233340
+  zero_popular    stable     trend_volatility -0.087516  4.011034e-29 16322 0.087516
+  zero_popular    stable     embed_similarity  0.010339  1.865624e-01 16322 0.010339
+  zero_popular    stable trend_overall_change  0.006018  4.420214e-01 16322 0.006018
+  zero_popular    stable     latest_pop_value       NaN           NaN 16322      NaN
+  zero_popular    stable            trend_min       NaN           NaN 16322      NaN

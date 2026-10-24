@@ -1,0 +1,88 @@
+Pairwise separability (age-stratified, log1p space): medium_popular__increase vs. zero_popular__stable
+(positive correlation = higher feature value favors zero_popular__stable; negative = favors medium_popular__increase)
+        age_bucket              feature  correlation  p_value     n                      note
+recent_multi_point     latest_pop_value      -0.4203   0.0000  6407               significant
+recent_multi_point            trend_min      -0.3542   0.0000  6407               significant
+recent_multi_point            trend_max      -0.1146   0.0000  6407               significant
+recent_multi_point trend_overall_change      -0.1123   0.0000  6407               significant
+recent_multi_point      time_since_peak       0.0729   0.0000  6407               significant
+recent_multi_point     trend_volatility      -0.0366   0.0034  6407               significant
+recent_multi_point      latest_momentum      -0.0271   0.0302  6407               significant
+recent_multi_point     embed_similarity       0.0262   0.0360  6407               significant
+recent_multi_point             item_age      -0.0125   0.3176  6407 not significant at p<0.05
+          maturing     latest_pop_value      -0.4686   0.0000 23445               significant
+          maturing trend_overall_change      -0.2677   0.0000 23445               significant
+          maturing      time_since_peak       0.1319   0.0000 23445               significant
+          maturing            trend_min      -0.1298   0.0000 23445               significant
+          maturing      latest_momentum       0.0910   0.0000 23445               significant
+          maturing             item_age      -0.0631   0.0000 23445               significant
+          maturing            trend_max      -0.0603   0.0000 23445               significant
+          maturing     trend_volatility      -0.0468   0.0000 23445               significant
+          maturing     embed_similarity       0.0200   0.0022 23445               significant
+[debut] skipped -- one side has zero members here (medium_popular__increase: n=8173, zero_popular__stable: n=0)
+[recent_single_point] skipped -- one side has zero members here (medium_popular__increase: n=520, zero_popular__stable: n=0)
+
+Pairwise separability (age-stratified, log1p space): medium_popular__stable vs. zero_popular__decrease
+(positive correlation = higher feature value favors zero_popular__decrease; negative = favors medium_popular__stable)
+         age_bucket              feature  correlation  p_value    n                        note
+recent_single_point     embed_similarity       0.0212   0.0745 7088   not significant at p<0.05
+recent_single_point     latest_pop_value       0.0042   0.7213 7088   not significant at p<0.05
+recent_single_point             item_age          NaN      NaN 7088 insufficient data/variation
+recent_single_point            trend_min          NaN      NaN    0 insufficient data/variation
+recent_single_point            trend_max          NaN      NaN    0 insufficient data/variation
+recent_single_point     trend_volatility          NaN      NaN    0 insufficient data/variation
+recent_single_point trend_overall_change          NaN      NaN    0 insufficient data/variation
+recent_single_point      time_since_peak          NaN      NaN    0 insufficient data/variation
+recent_single_point      latest_momentum          NaN      NaN    0 insufficient data/variation
+ recent_multi_point     latest_pop_value       0.1445   0.0000 1648                 significant
+ recent_multi_point     trend_volatility       0.0696   0.0047 1648                 significant
+ recent_multi_point            trend_max       0.0649   0.0084 1648                 significant
+ recent_multi_point trend_overall_change       0.0608   0.0135 1648                 significant
+ recent_multi_point      time_since_peak      -0.0574   0.0198 1648                 significant
+ recent_multi_point            trend_min       0.0528   0.0319 1648                 significant
+ recent_multi_point      latest_momentum       0.0526   0.0328 1648                 significant
+ recent_multi_point             item_age      -0.0464   0.0597 1648   not significant at p<0.05
+ recent_multi_point     embed_similarity       0.0333   0.1764 1648   not significant at p<0.05
+           maturing      latest_momentum       0.2018   0.0000 6433                 significant
+           maturing            trend_max      -0.1365   0.0000 6433                 significant
+           maturing     trend_volatility      -0.1025   0.0000 6433                 significant
+           maturing             item_age      -0.0788   0.0000 6433                 significant
+           maturing            trend_min      -0.0720   0.0000 6433                 significant
+           maturing trend_overall_change       0.0490   0.0001 6433                 significant
+           maturing      time_since_peak      -0.0405   0.0011 6433                 significant
+           maturing     latest_pop_value       0.0373   0.0027 6433                 significant
+           maturing     embed_similarity      -0.0101   0.4173 6433   not significant at p<0.05
+[debut] skipped -- one side has zero members here (medium_popular__stable: n=0, zero_popular__decrease: n=0)
+
+Pairwise separability (age-stratified, log1p space): high_popular__increase vs. medium_popular__decrease
+(positive correlation = higher feature value favors medium_popular__decrease; negative = favors high_popular__increase)
+         age_bucket              feature  correlation  p_value    n                        note
+recent_single_point     latest_pop_value       0.1125   0.0009  873                 significant
+recent_single_point     embed_similarity      -0.1007   0.0029  873                 significant
+recent_single_point             item_age          NaN      NaN  873 insufficient data/variation
+recent_single_point            trend_min          NaN      NaN    0 insufficient data/variation
+recent_single_point            trend_max          NaN      NaN    0 insufficient data/variation
+recent_single_point     trend_volatility          NaN      NaN    0 insufficient data/variation
+recent_single_point trend_overall_change          NaN      NaN    0 insufficient data/variation
+recent_single_point      time_since_peak          NaN      NaN    0 insufficient data/variation
+recent_single_point      latest_momentum          NaN      NaN    0 insufficient data/variation
+ recent_multi_point     latest_pop_value       0.2944   0.0000  599                 significant
+ recent_multi_point            trend_min       0.2420   0.0000  599                 significant
+ recent_multi_point            trend_max       0.1936   0.0000  599                 significant
+ recent_multi_point      time_since_peak      -0.1566   0.0001  599                 significant
+ recent_multi_point     embed_similarity       0.0949   0.0201  599                 significant
+ recent_multi_point     trend_volatility       0.0919   0.0245  599                 significant
+ recent_multi_point      latest_momentum       0.0715   0.0804  599   not significant at p<0.05
+ recent_multi_point             item_age      -0.0623   0.1276  599   not significant at p<0.05
+ recent_multi_point trend_overall_change       0.0336   0.4113  599   not significant at p<0.05
+           maturing      latest_momentum       0.2501   0.0000 2574                 significant
+           maturing            trend_max      -0.1863   0.0000 2574                 significant
+           maturing     trend_volatility      -0.1823   0.0000 2574                 significant
+           maturing            trend_min      -0.1658   0.0000 2574                 significant
+           maturing      time_since_peak      -0.1036   0.0000 2574                 significant
+           maturing trend_overall_change       0.0885   0.0000 2574                 significant
+           maturing             item_age       0.0424   0.0313 2574                 significant
+           maturing     latest_pop_value       0.0352   0.0742 2574   not significant at p<0.05
+           maturing     embed_similarity      -0.0096   0.6282 2574   not significant at p<0.05
+[debut] skipped -- one side has zero members here (high_popular__increase: n=460, medium_popular__decrease: n=0)
+

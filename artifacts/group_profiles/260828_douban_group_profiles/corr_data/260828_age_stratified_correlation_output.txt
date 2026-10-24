@@ -1,0 +1,248 @@
+      pop_cluster          direction          age_bucket              feature         r       p_value     n    abs_r
+   medium_popular           decrease recent_single_point     embed_similarity  0.109666  2.447984e-05  1474 0.109666
+   medium_popular           decrease  recent_multi_point     embed_similarity  0.098224  5.861781e-05  1668 0.098224
+   medium_popular           decrease            maturing     embed_similarity  0.039182  5.777967e-03  4961 0.039182
+   medium_popular           decrease recent_single_point     latest_pop_value  0.830151  0.000000e+00  1473 0.830151
+   medium_popular           decrease  recent_multi_point     latest_pop_value  0.768072  0.000000e+00  1668 0.768072
+   medium_popular           decrease            maturing     latest_pop_value  0.714066  0.000000e+00  4961 0.714066
+   medium_popular           decrease recent_single_point             item_age       NaN           NaN  1474      NaN
+   medium_popular           decrease  recent_multi_point             item_age -0.049257  4.427959e-02  1668 0.049257
+   medium_popular           decrease            maturing             item_age -0.160077  7.826583e-30  4961 0.160077
+   medium_popular           decrease recent_single_point            trend_min       NaN           NaN     0      NaN
+   medium_popular           decrease  recent_multi_point            trend_min  0.599599 2.151486e-163  1668 0.599599
+   medium_popular           decrease            maturing            trend_min  0.365006 3.350763e-156  4961 0.365006
+   medium_popular           decrease recent_single_point            trend_max       NaN           NaN     0      NaN
+   medium_popular           decrease  recent_multi_point            trend_max  0.573564 1.603462e-146  1668 0.573564
+   medium_popular           decrease            maturing            trend_max  0.316880 4.007129e-116  4961 0.316880
+   medium_popular           decrease recent_single_point     trend_volatility       NaN           NaN     0      NaN
+   medium_popular           decrease  recent_multi_point     trend_volatility  0.514417 2.402871e-113  1668 0.514417
+   medium_popular           decrease            maturing     trend_volatility  0.330704 6.525885e-127  4961 0.330704
+   medium_popular           decrease recent_single_point trend_overall_change       NaN           NaN     0      NaN
+   medium_popular           decrease  recent_multi_point trend_overall_change -0.146510  1.836728e-09  1668 0.146510
+   medium_popular           decrease            maturing trend_overall_change -0.016169  2.548589e-01  4961 0.016169
+   medium_popular           decrease recent_single_point      time_since_peak       NaN           NaN     0      NaN
+   medium_popular           decrease  recent_multi_point      time_since_peak -0.192825  1.958227e-15  1668 0.192825
+   medium_popular           decrease            maturing      time_since_peak -0.215548  3.079540e-53  4961 0.215548
+   medium_popular           decrease recent_single_point      latest_momentum       NaN           NaN     0      NaN
+   medium_popular           decrease  recent_multi_point      latest_momentum  0.139311  1.108383e-08  1668 0.139311
+   medium_popular           decrease            maturing      latest_momentum  0.292400  2.214028e-98  4961 0.292400
+   medium_popular           increase recent_single_point     embed_similarity -0.097379  1.808551e-04  1474 0.097379
+   medium_popular           increase  recent_multi_point     embed_similarity -0.055152  2.429174e-02  1668 0.055152
+   medium_popular           increase            maturing     embed_similarity -0.046516  1.048155e-03  4961 0.046516
+   medium_popular           increase recent_single_point     latest_pop_value -0.742713 1.702560e-258  1473 0.742713
+   medium_popular           increase  recent_multi_point     latest_pop_value -0.704055 6.132584e-250  1668 0.704055
+   medium_popular           increase            maturing     latest_pop_value -0.690565  0.000000e+00  4961 0.690565
+   medium_popular           increase recent_single_point             item_age       NaN           NaN  1474      NaN
+   medium_popular           increase  recent_multi_point             item_age  0.044024  7.225188e-02  1668 0.044024
+   medium_popular           increase            maturing             item_age  0.115285  3.788378e-16  4961 0.115285
+   medium_popular           increase recent_single_point            trend_min       NaN           NaN     0      NaN
+   medium_popular           increase  recent_multi_point            trend_min -0.519775 4.364932e-116  1668 0.519775
+   medium_popular           increase            maturing            trend_min -0.301183 1.499517e-104  4961 0.301183
+   medium_popular           increase recent_single_point            trend_max       NaN           NaN     0      NaN
+   medium_popular           increase  recent_multi_point            trend_max -0.516520 2.045678e-114  1668 0.516520
+   medium_popular           increase            maturing            trend_max -0.313296 2.032618e-113  4961 0.313296
+   medium_popular           increase recent_single_point     trend_volatility       NaN           NaN     0      NaN
+   medium_popular           increase  recent_multi_point     trend_volatility -0.450164  5.144788e-84  1668 0.450164
+   medium_popular           increase            maturing     trend_volatility -0.312665 6.032283e-113  4961 0.312665
+   medium_popular           increase recent_single_point trend_overall_change       NaN           NaN     0      NaN
+   medium_popular           increase  recent_multi_point trend_overall_change  0.115469  2.265549e-06  1668 0.115469
+   medium_popular           increase            maturing trend_overall_change  0.014107  3.204990e-01  4961 0.014107
+   medium_popular           increase recent_single_point      time_since_peak       NaN           NaN     0      NaN
+   medium_popular           increase  recent_multi_point      time_since_peak  0.232623  6.221487e-22  1668 0.232623
+   medium_popular           increase            maturing      time_since_peak  0.187725  1.397222e-40  4961 0.187725
+   medium_popular           increase recent_single_point      latest_momentum       NaN           NaN     0      NaN
+   medium_popular           increase  recent_multi_point      latest_momentum -0.168917  3.823938e-12  1668 0.168917
+   medium_popular           increase            maturing      latest_momentum -0.323633 2.532743e-121  4961 0.323633
+   medium_popular             stable recent_single_point     embed_similarity -0.017258  5.079291e-01  1474 0.017258
+   medium_popular             stable  recent_multi_point     embed_similarity -0.063213  9.813763e-03  1668 0.063213
+   medium_popular             stable            maturing     embed_similarity  0.015245  2.830302e-01  4961 0.015245
+   medium_popular             stable recent_single_point     latest_pop_value -0.121956  2.676777e-06  1473 0.121956
+   medium_popular             stable  recent_multi_point     latest_pop_value -0.080668  9.756146e-04  1668 0.080668
+   medium_popular             stable            maturing     latest_pop_value  0.070034  7.907549e-07  4961 0.070034
+   medium_popular             stable recent_single_point             item_age       NaN           NaN  1474      NaN
+   medium_popular             stable  recent_multi_point             item_age  0.006883  7.787931e-01  1668 0.006883
+   medium_popular             stable            maturing             item_age  0.036556  1.002281e-02  4961 0.036556
+   medium_popular             stable recent_single_point            trend_min       NaN           NaN     0      NaN
+   medium_popular             stable  recent_multi_point            trend_min -0.108231  9.423882e-06  1668 0.108231
+   medium_popular             stable            maturing            trend_min -0.032702  2.125647e-02  4961 0.032702
+   medium_popular             stable recent_single_point            trend_max       NaN           NaN     0      NaN
+   medium_popular             stable  recent_multi_point            trend_max -0.074246  2.411520e-03  1668 0.074246
+   medium_popular             stable            maturing            trend_max  0.040129  4.700334e-03  4961 0.040129
+   medium_popular             stable recent_single_point     trend_volatility       NaN           NaN     0      NaN
+   medium_popular             stable  recent_multi_point     trend_volatility -0.086442  4.087632e-04  1668 0.086442
+   medium_popular             stable            maturing     trend_volatility  0.022974  1.056642e-01  4961 0.022974
+   medium_popular             stable recent_single_point trend_overall_change       NaN           NaN     0      NaN
+   medium_popular             stable  recent_multi_point trend_overall_change  0.043939  7.280768e-02  1668 0.043939
+   medium_popular             stable            maturing trend_overall_change  0.000436  9.754879e-01  4961 0.000436
+   medium_popular             stable recent_single_point      time_since_peak       NaN           NaN     0      NaN
+   medium_popular             stable  recent_multi_point      time_since_peak -0.064461  8.452370e-03  1668 0.064461
+   medium_popular             stable            maturing      time_since_peak  0.006267  6.589809e-01  4961 0.006267
+   medium_popular             stable recent_single_point      latest_momentum       NaN           NaN     0      NaN
+   medium_popular             stable  recent_multi_point      latest_momentum  0.047865  5.064150e-02  1668 0.047865
+   medium_popular             stable            maturing      latest_momentum  0.082697  5.436333e-09  4961 0.082697
+     zero_popular           decrease recent_single_point     embed_similarity  0.000147  9.935119e-01  3071 0.000147
+     zero_popular           decrease  recent_multi_point     embed_similarity  0.015289  3.901863e-01  3161 0.015289
+     zero_popular           decrease            maturing     embed_similarity  0.031842  1.581357e-04 14072 0.031842
+     zero_popular           decrease recent_single_point     latest_pop_value  0.872013  0.000000e+00  3070 0.872013
+     zero_popular           decrease  recent_multi_point     latest_pop_value  0.913922  0.000000e+00  3160 0.913922
+     zero_popular           decrease            maturing     latest_pop_value  0.938006  0.000000e+00 14070 0.938006
+     zero_popular           decrease recent_single_point             item_age       NaN           NaN  3071      NaN
+     zero_popular           decrease  recent_multi_point             item_age -0.076043  1.869992e-05  3161 0.076043
+     zero_popular           decrease            maturing             item_age -0.135751  7.325633e-59 14072 0.135751
+     zero_popular           decrease recent_single_point            trend_min       NaN           NaN     0      NaN
+     zero_popular           decrease  recent_multi_point            trend_min  0.518441 5.867455e-217  3160 0.518441
+     zero_popular           decrease            maturing            trend_min  0.252229 4.321519e-203 14069 0.252229
+     zero_popular           decrease recent_single_point            trend_max       NaN           NaN     0      NaN
+     zero_popular           decrease  recent_multi_point            trend_max  0.550344 9.893643e-250  3160 0.550344
+     zero_popular           decrease            maturing            trend_max  0.321314  0.000000e+00 14069 0.321314
+     zero_popular           decrease recent_single_point     trend_volatility       NaN           NaN     0      NaN
+     zero_popular           decrease  recent_multi_point     trend_volatility  0.470084 1.720018e-173  3160 0.470084
+     zero_popular           decrease            maturing     trend_volatility  0.357813  0.000000e+00 14069 0.357813
+     zero_popular           decrease recent_single_point trend_overall_change       NaN           NaN     0      NaN
+     zero_popular           decrease  recent_multi_point trend_overall_change  0.098232  3.144396e-08  3160 0.098232
+     zero_popular           decrease            maturing trend_overall_change -0.028429  7.450139e-04 14069 0.028429
+     zero_popular           decrease recent_single_point      time_since_peak       NaN           NaN     0      NaN
+     zero_popular           decrease  recent_multi_point      time_since_peak -0.513294 5.430349e-212  3160 0.513294
+     zero_popular           decrease            maturing      time_since_peak -0.240789 9.997952e-185 14069 0.240789
+     zero_popular           decrease recent_single_point      latest_momentum       NaN           NaN     0      NaN
+     zero_popular           decrease  recent_multi_point      latest_momentum  0.341798  2.657023e-87  3160 0.341798
+     zero_popular           decrease            maturing      latest_momentum  0.497413  0.000000e+00 14069 0.497413
+     zero_popular             stable recent_single_point     embed_similarity -0.000147  9.935119e-01  3071 0.000147
+     zero_popular             stable  recent_multi_point     embed_similarity -0.015289  3.901863e-01  3161 0.015289
+     zero_popular             stable            maturing     embed_similarity -0.031842  1.581357e-04 14072 0.031842
+     zero_popular             stable recent_single_point     latest_pop_value -0.872013  0.000000e+00  3070 0.872013
+     zero_popular             stable  recent_multi_point     latest_pop_value -0.913922  0.000000e+00  3160 0.913922
+     zero_popular             stable            maturing     latest_pop_value -0.938006  0.000000e+00 14070 0.938006
+     zero_popular             stable recent_single_point             item_age       NaN           NaN  3071      NaN
+     zero_popular             stable  recent_multi_point             item_age  0.076043  1.869992e-05  3161 0.076043
+     zero_popular             stable            maturing             item_age  0.135751  7.325633e-59 14072 0.135751
+     zero_popular             stable recent_single_point            trend_min       NaN           NaN     0      NaN
+     zero_popular             stable  recent_multi_point            trend_min -0.518441 5.867455e-217  3160 0.518441
+     zero_popular             stable            maturing            trend_min -0.252229 4.321519e-203 14069 0.252229
+     zero_popular             stable recent_single_point            trend_max       NaN           NaN     0      NaN
+     zero_popular             stable  recent_multi_point            trend_max -0.550344 9.893643e-250  3160 0.550344
+     zero_popular             stable            maturing            trend_max -0.321314  0.000000e+00 14069 0.321314
+     zero_popular             stable recent_single_point     trend_volatility       NaN           NaN     0      NaN
+     zero_popular             stable  recent_multi_point     trend_volatility -0.470084 1.720018e-173  3160 0.470084
+     zero_popular             stable            maturing     trend_volatility -0.357813  0.000000e+00 14069 0.357813
+     zero_popular             stable recent_single_point trend_overall_change       NaN           NaN     0      NaN
+     zero_popular             stable  recent_multi_point trend_overall_change -0.098232  3.144396e-08  3160 0.098232
+     zero_popular             stable            maturing trend_overall_change  0.028429  7.450139e-04 14069 0.028429
+     zero_popular             stable recent_single_point      time_since_peak       NaN           NaN     0      NaN
+     zero_popular             stable  recent_multi_point      time_since_peak  0.513294 5.430349e-212  3160 0.513294
+     zero_popular             stable            maturing      time_since_peak  0.240789 9.997952e-185 14069 0.240789
+     zero_popular             stable recent_single_point      latest_momentum       NaN           NaN     0      NaN
+     zero_popular             stable  recent_multi_point      latest_momentum -0.341798  2.657023e-87  3160 0.341798
+     zero_popular             stable            maturing      latest_momentum -0.497413  0.000000e+00 14069 0.497413
+     high_popular           decrease recent_single_point     embed_similarity -0.012395  7.746509e-01   536 0.012395
+     high_popular           decrease  recent_multi_point     embed_similarity  0.115330  5.610673e-02   275 0.115330
+     high_popular           decrease            maturing     embed_similarity  0.258170  1.181379e-03   155 0.258170
+     high_popular           decrease recent_single_point     latest_pop_value  0.659181  4.104920e-68   536 0.659181
+     high_popular           decrease  recent_multi_point     latest_pop_value  0.716125  1.565799e-44   275 0.716125
+     high_popular           decrease            maturing     latest_pop_value  0.602859  1.041512e-16   155 0.602859
+     high_popular           decrease recent_single_point             item_age       NaN           NaN   536      NaN
+     high_popular           decrease  recent_multi_point             item_age -0.303257  2.939322e-07   275 0.303257
+     high_popular           decrease            maturing             item_age -0.184517  2.153932e-02   155 0.184517
+     high_popular           decrease recent_single_point            trend_min       NaN           NaN     0      NaN
+     high_popular           decrease  recent_multi_point            trend_min  0.573202  2.034228e-25   275 0.573202
+     high_popular           decrease            maturing            trend_min  0.285693  3.140061e-04   155 0.285693
+     high_popular           decrease recent_single_point            trend_max       NaN           NaN     0      NaN
+     high_popular           decrease  recent_multi_point            trend_max  0.430228  8.111775e-14   275 0.430228
+     high_popular           decrease            maturing            trend_max  0.357420  4.981747e-06   155 0.357420
+     high_popular           decrease recent_single_point     trend_volatility       NaN           NaN     0      NaN
+     high_popular           decrease  recent_multi_point     trend_volatility  0.341887  5.883281e-09   275 0.341887
+     high_popular           decrease            maturing     trend_volatility  0.359755  4.274989e-06   155 0.359755
+     high_popular           decrease recent_single_point trend_overall_change       NaN           NaN     0      NaN
+     high_popular           decrease  recent_multi_point trend_overall_change  0.059313  3.270974e-01   275 0.059313
+     high_popular           decrease            maturing trend_overall_change  0.011974  8.824427e-01   155 0.011974
+     high_popular           decrease recent_single_point      time_since_peak       NaN           NaN     0      NaN
+     high_popular           decrease  recent_multi_point      time_since_peak -0.196479  1.055204e-03   275 0.196479
+     high_popular           decrease            maturing      time_since_peak -0.032405  6.889515e-01   155 0.032405
+     high_popular           decrease recent_single_point      latest_momentum       NaN           NaN     0      NaN
+     high_popular           decrease  recent_multi_point      latest_momentum  0.149840  1.286256e-02   275 0.149840
+     high_popular           decrease            maturing      latest_momentum  0.017059  8.331330e-01   155 0.017059
+     high_popular             stable recent_single_point     embed_similarity  0.081627  5.895474e-02   536 0.081627
+     high_popular             stable  recent_multi_point     embed_similarity  0.117349  5.191149e-02   275 0.117349
+     high_popular             stable            maturing     embed_similarity -0.075355  3.513939e-01   155 0.075355
+     high_popular             stable recent_single_point     latest_pop_value -0.056006  1.954525e-01   536 0.056006
+     high_popular             stable  recent_multi_point     latest_pop_value -0.012698  8.339606e-01   275 0.012698
+     high_popular             stable            maturing     latest_pop_value  0.002068  9.796231e-01   155 0.002068
+     high_popular             stable recent_single_point             item_age       NaN           NaN   536      NaN
+     high_popular             stable  recent_multi_point             item_age  0.026129  6.661825e-01   275 0.026129
+     high_popular             stable            maturing             item_age -0.086849  2.825799e-01   155 0.086849
+     high_popular             stable recent_single_point            trend_min       NaN           NaN     0      NaN
+     high_popular             stable  recent_multi_point            trend_min  0.039622  5.129054e-01   275 0.039622
+     high_popular             stable            maturing            trend_min  0.104607  1.951944e-01   155 0.104607
+     high_popular             stable recent_single_point            trend_max       NaN           NaN     0      NaN
+     high_popular             stable  recent_multi_point            trend_max  0.080679  1.822043e-01   275 0.080679
+     high_popular             stable            maturing            trend_max  0.096891  2.303949e-01   155 0.096891
+     high_popular             stable recent_single_point     trend_volatility       NaN           NaN     0      NaN
+     high_popular             stable  recent_multi_point     trend_volatility  0.079790  1.870864e-01   275 0.079790
+     high_popular             stable            maturing     trend_volatility  0.102416  2.047665e-01   155 0.102416
+     high_popular             stable recent_single_point trend_overall_change       NaN           NaN     0      NaN
+     high_popular             stable  recent_multi_point trend_overall_change -0.106806  7.703180e-02   275 0.106806
+     high_popular             stable            maturing trend_overall_change -0.122515  1.288416e-01   155 0.122515
+     high_popular             stable recent_single_point      time_since_peak       NaN           NaN     0      NaN
+     high_popular             stable  recent_multi_point      time_since_peak  0.098890  1.017472e-01   275 0.098890
+     high_popular             stable            maturing      time_since_peak  0.043717  5.891118e-01   155 0.043717
+     high_popular             stable recent_single_point      latest_momentum       NaN           NaN     0      NaN
+     high_popular             stable  recent_multi_point      latest_momentum -0.062638  3.006562e-01   275 0.062638
+     high_popular             stable            maturing      latest_momentum -0.034947  6.659633e-01   155 0.034947
+     high_popular           increase recent_single_point     embed_similarity  0.002087  9.615451e-01   536 0.002087
+     high_popular           increase  recent_multi_point     embed_similarity -0.143571  1.720191e-02   275 0.143571
+     high_popular           increase            maturing     embed_similarity -0.231111  3.812191e-03   155 0.231111
+     high_popular           increase recent_single_point     latest_pop_value -0.653494  1.373436e-66   536 0.653494
+     high_popular           increase  recent_multi_point     latest_pop_value -0.713764  4.032136e-44   275 0.713764
+     high_popular           increase            maturing     latest_pop_value -0.602585  1.084105e-16   155 0.602585
+     high_popular           increase recent_single_point             item_age       NaN           NaN   536      NaN
+     high_popular           increase  recent_multi_point             item_age  0.297283  5.129302e-07   275 0.297283
+     high_popular           increase            maturing             item_age  0.214900  7.247027e-03   155 0.214900
+     high_popular           increase recent_single_point            trend_min       NaN           NaN     0      NaN
+     high_popular           increase  recent_multi_point            trend_min -0.583247  1.846909e-26   275 0.583247
+     high_popular           increase            maturing            trend_min -0.322183  4.346745e-05   155 0.322183
+     high_popular           increase recent_single_point            trend_max       NaN           NaN     0      NaN
+     high_popular           increase  recent_multi_point            trend_max -0.449978  4.092264e-15   275 0.449978
+     high_popular           increase            maturing            trend_max -0.391063  4.876405e-07   155 0.391063
+     high_popular           increase recent_single_point     trend_volatility       NaN           NaN     0      NaN
+     high_popular           increase  recent_multi_point     trend_volatility -0.361340  6.627686e-10   275 0.361340
+     high_popular           increase            maturing     trend_volatility -0.395347  3.558841e-07   155 0.395347
+     high_popular           increase recent_single_point trend_overall_change       NaN           NaN     0      NaN
+     high_popular           increase  recent_multi_point trend_overall_change -0.033766  5.771450e-01   275 0.033766
+     high_popular           increase            maturing trend_overall_change  0.031340  6.986690e-01   155 0.031340
+     high_popular           increase recent_single_point      time_since_peak       NaN           NaN     0      NaN
+     high_popular           increase  recent_multi_point      time_since_peak  0.172961  4.016262e-03   275 0.172961
+     high_popular           increase            maturing      time_since_peak  0.016902  8.346470e-01   155 0.016902
+     high_popular           increase recent_single_point      latest_momentum       NaN           NaN     0      NaN
+     high_popular           increase  recent_multi_point      latest_momentum -0.134967  2.520585e-02   275 0.134967
+     high_popular           increase            maturing      latest_momentum -0.004682  9.538962e-01   155 0.004682
+(all debut items) increase_vs_stable               debut     embed_similarity  0.084884  1.263339e-09  5101 0.084884
+
+=== TRUE MEMBER COUNTS PER (pop_cluster, direction, age_bucket) ===
+   pop_cluster pop_direction history_depth_bucket  n_true_members
+  high_popular      decrease             maturing              73
+  high_popular      decrease   recent_multi_point             140
+  high_popular      decrease  recent_single_point             338
+  high_popular      increase                debut             795
+  high_popular      increase             maturing              77
+  high_popular      increase   recent_multi_point             131
+  high_popular      increase  recent_single_point             196
+  high_popular        stable             maturing               5
+  high_popular        stable   recent_multi_point               4
+  high_popular        stable  recent_single_point               2
+medium_popular      decrease             maturing            1330
+medium_popular      decrease   recent_multi_point             684
+medium_popular      decrease  recent_single_point             605
+medium_popular      increase                debut            1286
+medium_popular      increase             maturing            2790
+medium_popular      increase   recent_multi_point             778
+medium_popular      increase  recent_single_point             715
+medium_popular        stable             maturing             841
+medium_popular        stable   recent_multi_point             206
+medium_popular        stable  recent_single_point             154
+  zero_popular      decrease             maturing            2237
+  zero_popular      decrease   recent_multi_point             541
+  zero_popular      decrease  recent_single_point             578
+  zero_popular        stable                debut            3020
+  zero_popular        stable             maturing           11835
+  zero_popular        stable   recent_multi_point            2620
+  zero_popular        stable  recent_single_point            2493
