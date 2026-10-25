@@ -1,58 +1,9 @@
 """
-Amazon (baby / home_and_kitchen) adaptation of the Qwen2-7B variant of
-s21_inference_vllm_llama2_7b_all_r1.py.
-
-Sibling of s21_inference_vllm_amazon.py (the Llama-2-7B Amazon version) --
-same vLLM-backed batch-inference client shape (build request -> post to
-vLLM -> save incrementally/resumable -> repair pass), just swapped to
-Qwen2-7B and picking up that reference's Qwen-specific changes. Imports
-build_target_item_block / PRODUCT_SYSTEM_PROMPT / load_retrieval_csv /
-_resolve_inference_month from s18_prepare_for_prediction_amazon.py, same
-as the Llama version -- one source of truth for the target-item prompt
-block, shared across both model backends and both prep scripts.
-
-What changed from s21_inference_vllm_amazon.py (the Llama-2 Amazon
-version), carried over from the movie/douban Qwen reference:
-
-  1. MODEL defaults to "qwen2-7b" instead of "llama-2-7b-chat-hf" (still a
-     --model override, same as the Llama version).
-
-  2. build_emoji_logit_bias's docstring + a startup warning are carried
-     over unchanged: Qwen2's BPE/tiktoken-style tokenizer may not expose
-     Llama-2 SentencePiece's '<0xF0>'-style byte tokens, so this mechanism
-     can silently do nothing for Qwen2. The warning fires once at startup
-     (right after the tokenizer loads) if build_emoji_logit_bias comes
-     back empty, so that's visible in the job log rather than a silent
-     no-op -- exactly as in the reference.
-
-  3. MAX_MODEL_LEN=8192 is kept (not raised to Qwen2's native 32768) with
-     a comment explaining why: capped to match Llama-2's context so the
-     two models are compared under the same budget, not because Qwen2
-     needs it.
-
-  4. repair_incomplete_rows carries the reference's real functional
-     change (not present in the Llama-2 Amazon version): every row now
-     gets a `was_repaired` (bool) and `repair_temperature` (the temperature
-     that fixed it, or None) column, written whether or not the repair
-     attempt succeeded -- an audit trail of which rows needed a retry and
-     at what temperature, instead of the earlier version's silent
-     in-place overwrite with no record a repair happened at all.
-
-  5. main() is parameterized by --category baby|home_and_kitchen (single script for
-     both categories, matching the Llama version), plus --model,
-     --tokenizer-path, --vllm-host/--vllm-port, --retrieval-csv-template,
-     --k-values, --output-dir (defaults to qwen2_7b_output/amazon_{category}/run_1,
-     mirroring the reference's OUTPUT_DIR naming), --inference-month,
-     --description-col, --max-retries.
-
-  6. Same dead-weight drops as the Llama Amazon version: parse_center_name,
-     capitalize_names, and the movie-specific build_movie_description /
-     _fallback_na (s18's copies are imported/reused instead) -- none are
-     called from this script's own main() even in the reference.
+Amazon (baby / home_and_kitchen) adaptation of the Qwen2-7B-Inst variant
 
 Run per category, e.g.:
     python3 s21_inference_vllm_qwen_amazon.py --category baby
-    python3 s21_inference_vllm_qwen_amazon.py --category home_and_kitchen --model qwen2-7b
+    python3 s21_inference_vllm_qwen_amazon.py --category home_and_kitchen --model qwen2-7b-inst
 """
 import argparse
 import csv
@@ -156,10 +107,7 @@ OUTPUT_JSON_SCHEMA = {
     "additionalProperties": False,
 }
 
-# Qwen2-7B natively supports up to 32768 tokens, far more than needed --
-# capped here to match Llama-2's (RoPE-extended) context budget for a fair
-# apples-to-apples comparison between the two models. No RoPE/YaRN scaling
-# needed for Qwen2 at this length.
+# Qwen2-7B natively supports up to 32768 tokens, far more than needed
 MAX_MODEL_LEN = 8192
 SAFETY_MARGIN = 50
 MAX_TOKENS_CEILING = 1600
