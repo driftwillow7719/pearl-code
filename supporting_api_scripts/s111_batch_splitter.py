@@ -2,15 +2,6 @@
 s111_batch_splitter.py -- split an oversized batch JSONL file into parts that
 each stay under OpenAI's 200 MB batch input file limit.
 
-WHY THIS EXISTS: a full-dataset feature-selection batch
-(feature_selection_batch.jsonl) can come out to ~300 MB,
-which OpenAI's Batch API rejects outright at submission time (status
-immediately goes to "failed" with 0/0 requests processed, since the file
-never passes validation). This splits that single JSONL into N part-files,
-each under a configurable size ceiling, WITHOUT ever splitting a line --
-each line is one complete, valid batch request, so lines are only ever
-kept whole and moved as a unit into whichever part-file has room.
-
 Each part gets its own suffix appended to a base tag (e.g. "part1",
 "part2", ...) so you can submit/track/download each one separately with
 your existing s12_batch_pipeline.py, using a distinct --tag per part:
