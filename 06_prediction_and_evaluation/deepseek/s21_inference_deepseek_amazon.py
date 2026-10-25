@@ -1,32 +1,5 @@
 """
 Amazon (baby / home_and_kitchen) inference client -- DeepSeek variant.
-
-Sibling of s21_inference_vllm_qwen_amazon.py / s21_inference_vllm_amazon.py,
-but calling DeepSeek's hosted API (deepseek_client.py) instead of a
-locally-served vLLM model. Reuses build_target_item_block /
-PRODUCT_SYSTEM_PROMPT / load_retrieval_csv / _resolve_inference_month from
-s18_prepare_for_prediction_amazon.py -- same source of truth for the
-target-item prompt block as every other model backend in this pipeline.
-
-What's different from the vLLM Amazon scripts (see deepseek_client.py's
-module docstring for the full rationale on each of these):
-  - No --seed / seed field at all (not supported by DeepSeek's API, and
-    not needed -- a hosted API naturally varies run-to-run, same as
-    GPT-4o-mini elsewhere in this study).
-  - No logit_bias / emoji banning (not supported).
-  - No local tokenizer / precise prompt-token budgeting -- max_tokens is a
-    fixed ceiling given DeepSeek's much larger context window.
-  - response_format is generic {"type": "json_object"}, not the strict
-    json_schema mode vLLM uses -- expect a somewhat higher invalid-JSON
-    rate, caught by the same is_valid_result()/repair-pass safety net.
-  - Sequential (one request at a time) since DeepSeek has no batch API --
-    functionally the same shape as run_via_vllm, just against a hosted
-    endpoint with retry/backoff on transient errors.
-  - Runs directly on any machine with network access (no GPU / vLLM
-    server needed) -- no PBS submission required, though you can still
-    wrap this in a lightweight CPU job if your cluster prefers everything
-    go through the scheduler.
-
 Run per category, e.g.:
     export DEEPSEEK_API_KEY=sk-...
     python3 s21_inference_deepseek_amazon.py --category baby
