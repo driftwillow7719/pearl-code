@@ -1,55 +1,5 @@
 """
-Amazon (baby / home_and_kitchen) adaptation of the Llama-3-8B variant of
-s21_inference_vllm_llama2_7b_all_r1.py.
-
-Sibling of s21_inference_vllm_amazon.py (the Llama-2-7B Amazon version) and
-s21_inference_vllm_qwen_amazon.py (the Qwen2-7B Amazon version) -- same
-vLLM-backed batch-inference client shape (build request -> post to vLLM ->
-save incrementally/resumable -> repair pass), just swapped to Llama-3-8B.
-Imports build_target_item_block / PRODUCT_SYSTEM_PROMPT / load_retrieval_csv
-/ _resolve_inference_month from s18_prepare_for_prediction_amazon.py, same
-as the other two variants -- one source of truth for the target-item
-prompt block, shared across all model backends and both prep scripts.
-
-What changed from s21_inference_vllm_amazon.py (the Llama-2 Amazon
-version):
-
-  1. MODEL defaults to "llama-3-8b" instead of "llama-2-7b-chat-hf" (still
-     a --model override, same as the other two variants) -- pass your
-     local checkpoint's folder name here and match it in vLLM's own
-     `vllm serve` invocation.
-
-  2. build_emoji_logit_bias's docstring + a startup warning (same pattern
-     as the Qwen variant): Llama-3 uses a different tokenizer from
-     Llama-2's SentencePiece -- a tiktoken-style BPE vocab (128k tokens) --
-     that may not expose the same '<0xF0>'-style byte-fallback token
-     strings. If none are found, `emoji_logit_bias` comes back empty and
-     the emoji-banning mechanism silently does nothing; the warning fires
-     once at startup so that's visible in the job log rather than a silent
-     no-op.
-
-  3. MAX_MODEL_LEN=8192 matches Llama-3-8B's own native (non-extended)
-     context window, so no capping-down is needed here the way it was for
-     Qwen2's 32768 -- it's a coincidence of budget parity with Llama-2, not
-     an artificial cap. If your checkpoint is a long-context Llama-3.1/3.2
-     variant instead, you can safely raise this to make use of the extra
-     room (with --k-values / retrieval csv sizes chosen accordingly).
-
-  4. repair_incomplete_rows writes `was_repaired` (bool) and
-     `repair_temperature` columns for every row that needed a repair
-     attempt (whether or not it was actually fixed), matching the other
-     two variants' audit trail.
-
-  5. main() is parameterized by --category baby|home_and_kitchen (single script for
-     both categories) plus --model, --tokenizer-path, --vllm-host/
-     --vllm-port, --retrieval-csv-template, --k-values, --output-dir
-     (defaults to llama_3_8b_output/amazon_{category}/run_1),
-     --inference-month, --description-col, --max-retries, --seed.
-
-  6. Same dead-weight drops as the other two Amazon variants:
-     parse_center_name, capitalize_names, and the movie-specific
-     build_movie_description / _fallback_na (s18's copies are
-     imported/reused instead).
+Amazon (baby / home_and_kitchen) adaptation of the Llama-3-8B variant
 
 Run per category, e.g.:
     python3 s21_inference_vllm_llama3_amazon.py --category baby
@@ -62,13 +12,6 @@ import os
 import pandas as pd
 import requests as http
 from transformers import AutoTokenizer
-
-# from s18_prepare_for_prediction_amazon import (
-#     build_target_item_block,
-#     PRODUCT_SYSTEM_PROMPT,
-#     load_retrieval_csv,
-#     _resolve_inference_month,
-# )
 
 import os as _os
 import sys as _sys
