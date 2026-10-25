@@ -1,7 +1,6 @@
 """
 Top-K related recommendation metrics. Includes Precision@K, Recall@K, Hit Rate@K, F1@K.
 
-Date: 2025-06-27
 """
 
 
