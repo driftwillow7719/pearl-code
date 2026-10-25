@@ -6,61 +6,6 @@ Prediction batch prep: builds the final LLM prediction request (system
 prompt + target item block + retrieved-context block) from
 s17_retrieved_item_formatting_component_ablation.py's per-query retrieval-context CSV.
 
-What's UNCHANGED: the overall batch-construction shape (prepare_batch_input/
-save_jsonl), _month_label/_month_before date-window helpers, and
-build_target_trend_line's rendering logic (reused directly -- it already
-takes trend_array/release_date/inference_month_str as generic parameters).
-
-What changed, and why:
-
-  1. No movie metadata. The movie reference's build_movie_description()
-     assembled a templated paragraph from ~9 structured columns (genre,
-     director, writers, top5_actors, producers, music, language,
-     release_date, synopsis) that simply don't exist in this Amazon
-     pipeline -- s5_preprocess_datasets_full.py's output only ever carries a
-     single free-text column (product_description, or item_description on
-     the training side -- see build_item_description's column-name
-     fallback). So build_item_description() below just returns that text
-     directly instead of templating it into a sentence -- there's nothing
-     structured to template. capitalize_names/_fallback_na (used only for
-     the removed cast/crew fields) and sample_equal_per_direction (a
-     movie-dataset-specific stratified sampler, unused in main() even in
-     the reference) are dropped as dead weight.
-
-  2. trend_array is re-parsed with float(), not int() -- matching every
-     other _amazon script in this pipeline (_TREND_ARRAY_SPLIT_PATTERN's
-     int(...) cast in load_retrieval_csv is replaced).
-
-  3. The system prompt is reworded for a generic e-commerce product
-     instead of a movie ("MovieDescription"/"movie popularity analyst" ->
-     "ProductDescription"/"product popularity analyst"), but keeps the
-     exact same two-step reasoning contract and JSON output shape as the
-     movie reference's "Simple Prompt V5" (predict from
-     ProductDescription+PopularityHistory first, then adjust using
-     SimilarPastItems) -- see PRODUCT_SYSTEM_PROMPT below. The many other
-     prompt variants commented out in the movie reference (v2, v4, the
-     LatestKnownScore-anchored version) are not carried over -- only the
-     one actually wired into prepare_batch_input's call in main().
-
-  4. INFERENCE_MONTH_STR is read from the retrieval-context CSV's own
-     predict_timestamp column (s5_preprocess_datasets_full.py stamps every
-     row with the same fixed month, e.g. "2014-06") rather than hardcoded,
-     with an explicit mismatch check in case a future test set ever mixes
-     months -- --inference-month overrides this if you need to force one.
-
-  5. main() is parameterized by --category baby|home_and_kitchen, with Amazon
-     file-naming defaults matching s17's actual output filenames
-     (RETRIEVAL_CSV_TEMPLATE below), instead of the movie project's fixed
-     processed_results/260828_test/... paths.
-
-  6. normalize_explanatory_factor_bullets / _BULLET_FIX_PATTERN are kept
-     UNCHANGED -- they clean up the same "[Domain - Category - Impact]:"
-     bullet shape amazon_system_prompt.txt's ANSWER_FORMAT produces (see
-     s17_retrieved_item_formatting_component_ablation.py's docstring point 1), so
-     they're directly reusable once explanatory_factors is populated,
-     even though nothing calls them yet in this script's main() (same as
-     in the movie reference).
-
 Run per category, e.g.:
     python s18_prepare_for_prediction_amazon.py --category baby
 """
