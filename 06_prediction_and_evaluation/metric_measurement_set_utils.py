@@ -1,7 +1,5 @@
 """
 Setwise metrics related to the fine-tuning process.
-
-Date: 2025-08-23
 """
 
 
