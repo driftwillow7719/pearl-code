@@ -8,10 +8,6 @@ Eq. 12:
 Score sources (exports of the personalized models):
     HGN/user_item_scores.csv.gz     -- columns: user_id, item_id, original_item_id, hgn_score
     LLMESR/user_item_scores.csv.gz  -- columns: user_id, item_id, original_item_id, llmesr_score
-Both cover the full 6,437-user / 4,915-candidate test cohort, with NO
-missing users and NO ambiguous-ID issues (see each folder's README.md /
-metadata.json). This script merges the two on (user_id, item_id,
-original_item_id) to build the personalized half of the mixture.
 
 Normalization: hgn_score / llmesr_score are min-max normalized GLOBALLY
 (across the whole score set), not per user -- preserves the original
