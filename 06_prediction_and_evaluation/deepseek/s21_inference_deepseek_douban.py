@@ -1,29 +1,6 @@
 """
 Douban (movie) inference client -- DeepSeek variant.
 
-Sibling of s21_inference_vllm_qwen_douban.py / s21_inference_vllm_llama3_douban.py,
-but calling DeepSeek's hosted API (deepseek_client.py) instead of a
-locally-served vLLM model. All prompt-building logic (build_movie_description,
-build_target_trend_line, build_target_item_block, SYSTEM_PROMPT,
-load_retrieval_csv) is copied unchanged from s21_inference_vllm_qwen_douban.py
--- same source of truth for what the model actually sees, so DeepSeek's
-results stay comparable to the other backends.
-
-What's different from the vLLM Douban scripts (see deepseek_client.py's
-module docstring for the full rationale on each of these):
-  - No SEED env var / seed field at all (not supported by DeepSeek's API,
-    and not needed -- a hosted API naturally varies run-to-run, same as
-    GPT-4o-mini elsewhere in this study).
-  - No EMOJI_LOGIT_BIAS (not supported).
-  - No local tokenizer / precise prompt-token budgeting -- max_tokens is a
-    fixed ceiling given DeepSeek's much larger context window.
-  - response_format is generic {"type": "json_object"}, not the strict
-    json_schema mode vLLM uses -- expect a somewhat higher invalid-JSON
-    rate, caught by the same is_valid_result()/repair-pass safety net.
-  - Sequential (one request at a time) since DeepSeek has no batch API.
-  - Runs directly on any machine with network access (no GPU / vLLM
-    server needed) -- no PBS submission required.
-
 Run, e.g.:
     export DEEPSEEK_API_KEY=sk-...
     OUTPUT_DIR=deepseek_flash_output/douban_movies/run_1 python3 s21_inference_deepseek_douban.py
