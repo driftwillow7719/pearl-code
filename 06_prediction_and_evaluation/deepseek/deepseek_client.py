@@ -2,59 +2,6 @@
 Shared DeepSeek Chat Completions API client, used by both
 s21_inference_deepseek_amazon.py and s21_inference_deepseek_douban.py.
 
-DeepSeek's API (https://api-docs.deepseek.com/api/create-chat-completion)
-differs from the vLLM-served Llama-2/Qwen2/Llama-3 backends in ways that
-matter for this pipeline:
-
-  1. NO BATCH API. Confirmed from the docs -- there's no equivalent to a
-     batch endpoint, so every request goes out one at a time, sequentially.
-     This matches the pipeline's existing resume/repair architecture,
-     which already sends requests one at a time to vLLM too --
-     run_via_deepseek below is the same shape as run_via_vllm, just
-     pointed at a hosted API instead of a local server.
-
-  2. NO `seed` PARAMETER. Not documented anywhere in the API reference.
-     This is fine methodologically, not a gap to work around: a hosted
-     API naturally varies run-to-run without an explicit seed, the same
-     way GPT-4o-mini already does in this study -- it's only a *local*
-     vLLM server that reuses the same RNG state across independent
-     launches and needs an explicit --seed to get genuine variance. So
-     DeepSeek replicate runs (run_1/run_2/run_3) need no seed parameter
-     at all; folder-per-run is still used purely to keep results
-     organized, not to force variance.
-
-  3. NO `logit_bias`. Not documented. The emoji-banning trick used for
-     Llama-2/Qwen2 (build_emoji_logit_bias) has no equivalent here and is
-     dropped entirely rather than risk sending an unsupported field.
-
-  4. `response_format` ONLY supports `{"type": "json_object"}` (generic
-     JSON mode) -- NOT the strict `json_schema` mode vLLM/OpenAI support.
-     The docs note json_object mode "requires explicit JSON instruction
-     in prompts" -- the shared SYSTEM_PROMPT/PRODUCT_SYSTEM_PROMPT texts
-     already explicitly instruct "Output a single, valid JSON object...",
-     so this requirement is already satisfied without changing those
-     prompts. Because there's no schema enforcement, expect a higher
-     invalid-JSON rate than vLLM's json_schema mode -- the existing
-     is_valid_result() + repair-pass architecture (unchanged in spirit)
-     is exactly the safety net for this.
-
-  5. No `repetition_penalty` in DeepSeek's API (that's a vLLM-specific
-     extension, not part of the OpenAI-compatible spec DeepSeek follows).
-     The repair pass's retry escalation uses ONLY increasing temperature,
-     not the temperature+repetition_penalty combo the vLLM scripts use.
-
-  6. No local tokenizer. DeepSeek's context window is enormous (up to
-     384K tokens) relative to this pipeline's prompts (at most a few
-     thousand tokens), so max_tokens is set to a fixed generous ceiling
-     rather than computed from a precise prompt-token count -- there's no
-     realistic way to run out of context budget here.
-
-Model: deepseek-flash (chosen for cost/speed, comparable in scale to the
-local 7B models rather than deepseek-v4-pro's flagship pricing/latency).
-Thinking mode: disabled (keeps behavior directly comparable to the other
-models' single 'reasoning' JSON field, instead of a separate
-'reasoning_content' field with extra cost/latency).
-
 Auth: reads DEEPSEEK_API_KEY from the environment (or --api-key). Get a
 key at https://platform.deepseek.com/api_keys -- never hardcode it here.
 """
