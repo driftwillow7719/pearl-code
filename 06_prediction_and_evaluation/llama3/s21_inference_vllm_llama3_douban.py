@@ -1,36 +1,8 @@
 """
 Douban (movie) vLLM batch inference client -- Llama-3-8B variant.
 
-Sibling of s21_inference_vllm_llama3_douban.py (Llama-2-7B) and
-s21_inference_vllm_qwen_douban.py (Qwen2-7B) -- same request/save/repair
-shape, swapped to Llama-3-8B, plus the same SEED/OUTPUT_DIR env-var support
-(see s21_inference_vllm_llama3_douban.py's docstring for why SEED matters).
-
-What changed from s21_inference_vllm_llama3_douban.py:
-
-  1. MODEL defaults to "llama-3-8b" instead of "llama-2-7b-chat-hf"
-     (tokenizer is loaded from MODEL, same as the Qwen variant).
-
-  2. build_emoji_logit_bias's docstring + a startup warning: Llama-3 uses a
-     different tokenizer from Llama-2's SentencePiece -- a tiktoken-style
-     BPE vocab (128k tokens) -- that may not expose the same '<0xF0>'-style
-     byte-fallback token strings, so EMOJI_LOGIT_BIAS can silently come
-     back empty. The warning fires once at import time if that happens.
-
-  3. MAX_MODEL_LEN=8192 matches Llama-3-8B's own native (non-extended)
-     context window -- no capping-down needed here the way it was for
-     Qwen2's 32768. If your checkpoint is a long-context Llama-3.1/3.2
-     variant, this can safely be raised.
-
-  4. repair_incomplete_rows writes `was_repaired` (bool) and
-     `repair_temperature` columns for every row that needed a repair
-     attempt, matching the Qwen douban script's audit trail.
-
-  5. OUTPUT_DIR defaults to llama_3_8b_output/douban_movies/run_1
-     (matching the naming convention of the other two douban scripts).
-
 Run, e.g.:
-    python3 s21_inference_vllm_llama3_douban.py                        # SEED/OUTPUT_DIR unset -> warns, old behavior
+    python3 s21_inference_vllm_llama3_douban.py                        
     SEED=1 OUTPUT_DIR=llama_3_8b_output/douban_movies/run_1 python3 s21_inference_vllm_llama3_douban.py
     SEED=2 OUTPUT_DIR=llama_3_8b_output/douban_movies/run_2 python3 s21_inference_vllm_llama3_douban.py
     SEED=3 OUTPUT_DIR=llama_3_8b_output/douban_movies/run_3 python3 s21_inference_vllm_llama3_douban.py
