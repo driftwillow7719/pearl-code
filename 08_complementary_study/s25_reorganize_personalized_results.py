@@ -3,12 +3,6 @@ s25_reorganize_personalized_results.py — Reorganize pare_hr_ndcg_results_kitch
   - keep only: variant, popularity_col, model, beta, hr@5, hr@10, ndcg@5, ndcg@10
   - order rows by model, then beta (increasing)
   - split into separate files per popularity_col (norm_predict_popularity_score, norm_rank10, norm_rank20)
-
-Note: the new pipeline (the personalized models' full-candidate export) doesn't have retrieval
-variants anymore (no more k1_full/k5_full/k10_full/no_retrieval distinction --
-that was tied to the old candidate-retrieval pipeline). Every run here is the
-same full-candidate setup, so `variant` is hardcoded to "k10_full" for
-labeling consistency with the paper's tables, not read from the data.
 """
 import os
 import pandas as pd
