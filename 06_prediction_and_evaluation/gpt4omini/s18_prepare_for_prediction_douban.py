@@ -1,8 +1,5 @@
 """
-THIS IS FOR SIMPLIFIED PROMPT EXPERIMENT
-
-Prediction batch prep, adapted from s1_prepare_pred_batch_v4.py for the
-current retrieval pipeline + prediction_sys_prompt_v5.txt.
+Douban Prediction File
 """
 import json
 import os
@@ -248,111 +245,6 @@ def build_target_item_block(row, inference_month_str):
 
 def prepare_batch_input(df, model, variant_tag, inference_month_str,
                          include_retrieval=True, output_dir="."):
-# SIMPLEST V2
-#     system_prompt = """You are an expert movie popularity analyst. Your task is to predict a movie's popularity score at a given point in time, based on its own
-# descriptive features, its historical popularity trajectory (when available), and a set of retrieved past movies with similar description and popularity patterns.
-
-# ### About <PopularityHistory>:
-# <PopularityHistory> covers the target's own monthly popularity values from
-# release through one month before <InferenceTimestamp> -- it does not
-# include the value at <InferenceTimestamp> itself, which is what you are
-# being asked to predict.
-
-# ### About <SimilarPastItems>:
-# <SimilarPastItems> shows past movies retrieved for similar description and
-# popularity pattern, listed by descending similarity to the target movie --
-# they will not necessarily match the target's outcome. For non-debut items,
-# each item's own trend line covers its own history up through one month
-# before its own outcome month; its outcome is stated only as a relative
-# percentage change from that trend's last value (never the raw outcome
-# number itself), showing how much the observed popularity moved. For debut
-# items, no trend line is provided since there is no history, and the
-# outcome is stated only as a final popularity tier.
-
-# Steps:
-# 1. First, estimate the target's popularity using only <MovieDescription>
-#    and <PopularityHistory> (when available).
-
-# 2. Then review <SimilarPastItems>. For each retrieved item, check whether
-#    its trend trajectory and explanatory factors -- covering both its own
-#    movie description and its own popularity history -- are actually
-#    applicable to the target item. Use this review to adjust your step 1
-#    estimate up, down, or keep it stable. Repeated factors across items
-#    count as one signal, not reinforcement.
-
-# Output a single, valid JSON object with exactly these two keys:
-
-# - `reasoning`: must cover two things, in order -- (1) your step 1 initial
-#   estimate and what it's based on, and (2) your justification for the
-#   final predict_popularity_score, including whether and why
-#   <SimilarPastItems> moved it up, down, or left it unchanged from that
-#   initial estimate.
-# - `predict_popularity_score`: your final predicted popularity score at the
-#   given <InferenceTimestamp>. Non-negative integer, formatted as a string.
-
-# Output only this JSON object, with nothing before or after.
-
-# ### Input format:
-
-# <MovieDescription>...</MovieDescription>
-# <PopularityHistory>...</PopularityHistory>
-# <InferenceTimestamp>...</InferenceTimestamp>
-# <SimilarPastItems>...</SimilarPastItems>
-# """
-
-# Simplest V4 (slight adjustment of version 2)
-#     system_prompt = """You are an expert movie popularity analyst. Your task is to predict a movie's popularity score at a given point in time, based on its own
-# descriptive features, its historical popularity trajectory (when available), and a set of retrieved past movies with similar description and popularity patterns.
-
-# ### About <PopularityHistory>:
-# <PopularityHistory> covers the target's own monthly popularity values from
-# release through one month before <InferenceTimestamp> -- it does not
-# include the value at <InferenceTimestamp> itself, which is what you are
-# being asked to predict.
-
-# ### About <SimilarPastItems>:
-# <SimilarPastItems> shows past movies retrieved for similar description and
-# popularity pattern, listed by descending similarity to the target movie --
-# they will not necessarily match the target's outcome. For non-debut items,
-# each item's own trend line covers its own history up through one month
-# before its own outcome month; its outcome is stated only as a relative
-# percentage change from that trend's last value (never the raw outcome
-# number itself), showing how much the observed popularity moved. For debut
-# items, no trend line is provided since there is no history, and the
-# outcome is stated only as a final popularity tier.
-
-# Steps:
-# 1. First, estimate the target's popularity score using only <MovieDescription>
-#    and <PopularityHistory> (when available). It's a specific number, not a tier label 
-#    such as "medium_popular" or "high_popular".
-
-# 2. Then review <SimilarPastItems>. For each retrieved item, check whether
-#    its trend trajectory and explanatory factors -- covering both its own
-#    movie description and its own popularity history -- are actually
-#    applicable to the target item. Use this review to adjust your step 1
-#    estimate up, down, or keep it stable. Repeated factors across items
-#    count as one signal, not reinforcement.
-
-# Output a single, valid JSON object with exactly these two keys:
-
-# - `reasoning`: must cover two things, in order -- (1) your step 1 initial
-#   estimate and what it's based on, and (2) your justification for the
-#   final predict_popularity_score, including whether and why
-#   <SimilarPastItems> moved it up, down, or left it unchanged from that
-#   initial estimate.
-# - `predict_popularity_score`: your final predicted popularity score at the
-#   given <InferenceTimestamp>. Non-negative integer, formatted as a string.
-
-# Output only this JSON object, with nothing before or after.
-
-# ### Input format:
-
-# <MovieDescription>...</MovieDescription>
-# <PopularityHistory>...</PopularityHistory>
-# <InferenceTimestamp>...</InferenceTimestamp>
-# <SimilarPastItems>...</SimilarPastItems>
-# """
-
 # Simple Prompt V5 (stripped direction and popularity tiers) + no indication which one is most similar, but sorted ascending
     system_prompt = """You are an expert movie popularity analyst. Your task is to predict a movie's popularity score at a given point in time, based on its own
 descriptive features, its historical popularity trajectory (when available), and a set of retrieved past movies with similar description and popularity patterns.
@@ -398,57 +290,6 @@ Output only this JSON object, with nothing before or after.
 <InferenceTimestamp>...</InferenceTimestamp>
 <SimilarPastItems>...</SimilarPastItems>
 """
-
-
-# Simple Prompt V5 (direction and popularity tiers stripped) + anchor on latest pop value
-#     system_prompt = """You are an expert movie popularity analyst. Your task is to predict a movie's popularity score at a given point in time, based on its own
-# descriptive features, its historical popularity trajectory (when available), and a set of retrieved past movies with similar description and popularity patterns.
-
-# ### About <PopularityHistory>:
-# <PopularityHistory> covers the target's own monthly popularity values from
-# release through one month before <InferenceTimestamp> -- it does not
-# include the value at <InferenceTimestamp> itself, which is what you are
-# being asked to predict.
-
-# ### About <SimilarPastItems>:
-# <SimilarPastItems> shows past movies retrieved for similar description and
-# popularity pattern, listed by descending similarity to the target movie --
-# they will not necessarily match the target's outcome. Each retrieved item includes its explanatory factors, which may reference relevant details about the movie itself. 
-# For non-debut items, this is paired with the item's own trend line (covering its history up through one month before its own outcome month) and its outcome stated only as a relative percentage change from that trend's last value (never the raw outcome number itself), showing how much the observed popularity moved. 
-# For debut items, neither a trend line nor an outcome value is provided, since there is no prior popularity history — explanatory factors are all that's available for these cases.
-
-# Steps:
-# 1. First, estimate the target's popularity score.
-#    - For non-debut items: start from <LatestKnownScore> as your anchor point,
-#      then adjust based on the trajectory shown in <PopularityHistory> and
-#      <MovieDescription>. Do not anchor on any other value from the trend
-#      history (e.g., a past peak) -- <LatestKnownScore> is your starting point.
-#    - For debut items (no <PopularityHistory> or <LatestKnownScore> provided):
-#      base your estimate solely on <MovieDescription>.
-#    It's a specific number, not a category label.
-# 2. Then review <SimilarPastItems>. For each retrieved item, check whether its explanatory factors — and, for non-debut items, its trend trajectory — are actually applicable to the target item. 
-#    Use this review to adjust your step 1 estimate up, down, or keep it stable. Repeated factors across items count as one signal, not reinforcement.
-
-# Output a single, valid JSON object with exactly these two keys:
-
-# - `reasoning`: must cover two things, in order -- (1) your step 1 initial
-#   estimate and what it's based on, and (2) your justification for the
-#   final predict_popularity_score, including whether and why
-#   <SimilarPastItems> moved it up, down, or left it unchanged from that
-#   initial estimate.
-# - `predict_popularity_score`: your final predicted popularity score at the
-#   given <InferenceTimestamp>. Non-negative integer, formatted as a string.
-
-# Output only this JSON object, with nothing before or after.
-
-# ### Input format:
-
-# <MovieDescription>...</MovieDescription>
-# <PopularityHistory>...</PopularityHistory>
-# <LatestKnownScore>...</LatestKnownScore>
-# <InferenceTimestamp>...</InferenceTimestamp>
-# <SimilarPastItems>...</SimilarPastItems>
-# """
 
     print(f"Preparing batch: variant={variant_tag} (include_retrieval={include_retrieval}), {len(df)} rows")
 
