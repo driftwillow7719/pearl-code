@@ -1,38 +1,8 @@
 """
-Douban (movie) vLLM batch inference client -- Qwen2-7B variant.
-
-Sibling of s21_inference_vllm_llama3_douban.py (the Llama-2-7B douban
-version) -- same request/save/repair shape, swapped to Qwen2-7B, plus the
-same SEED support (see that file's docstring for why SEED matters: without
-it, vLLM's OpenAI-compatible server reuses the same RNG state across
-independent launches, so replicate runs come back byte-identical even at
-temperature=0.1).
-
-What changed from s21_inference_vllm_llama3_douban.py:
-
-  1. MODEL defaults to "qwen2-7b" instead of "llama-2-7b-chat-hf" (tokenizer
-     is loaded from MODEL too, instead of a separately hardcoded string).
-
-  2. build_emoji_logit_bias's docstring + a startup warning: Qwen2's
-     BPE/tiktoken-style tokenizer may not expose Llama-2 SentencePiece's
-     '<0xF0>'-style byte tokens, so EMOJI_LOGIT_BIAS can silently come back
-     empty for Qwen2. The warning fires once at import time if that
-     happens, so it's visible in the job log rather than a silent no-op.
-
-  3. MAX_MODEL_LEN=8192 is kept (not raised to Qwen2's native 32768), with
-     a comment explaining it's capped to match Llama-2's context budget for
-     a fair apples-to-apples comparison between the two models.
-
-  4. repair_incomplete_rows now writes a `was_repaired` (bool) and
-     `repair_temperature` column for every row that needed a repair
-     attempt (whether or not it was actually fixed), instead of silently
-     overwriting content with no record a repair happened.
-
-  5. OUTPUT_DIR defaults to qwen2_7b_output/douban_movies/run_1 (matching
-     the Amazon Qwen script's output-dir naming convention).
+Douban (movie) vLLM batch inference client -- Qwen2-7B-Inst
 
 Run, e.g.:
-    python3 s21_inference_vllm_qwen_douban.py                    # SEED/OUTPUT_DIR unset -> warns, old behavior
+    python3 s21_inference_vllm_qwen_douban.py                    
     SEED=1 OUTPUT_DIR=qwen2_7b_output/douban_movies/run_1 python3 s21_inference_vllm_qwen_douban.py
     SEED=2 OUTPUT_DIR=qwen2_7b_output/douban_movies/run_2 python3 s21_inference_vllm_qwen_douban.py
     SEED=3 OUTPUT_DIR=qwen2_7b_output/douban_movies/run_3 python3 s21_inference_vllm_qwen_douban.py
@@ -48,7 +18,6 @@ from transformers import AutoTokenizer
 
 # ── CONFIG ────────────────────────────────────────────────────────────────
 RETRIEVAL_CSV_TEMPLATE = (
-    # "synthetic_data_generation/260827/260828_test/gpt4o/0904_full_simple_prompt_v4/mapping_k{k}_a50_b50_sig1_gtcase1_gtprior1.csv"
     "0911_douban_test_retrieved_format/retrieval_context_per_query_embed_rerank_k{k}_a50_b50_sig1_gtcase1_gtprior0_simscore0.csv"
 )
 _TREND_ARRAY_SPLIT_PATTERN = re.compile(r"[,\s]+")
@@ -74,23 +43,6 @@ if SEED is None:
           "this is one of several replicate runs, set SEED=1/2/3/... per run "
           "(and update OUTPUT_DIR below to match) or they will come back "
           "byte-identical.")
-
-# OUTPUT_JSON_SCHEMA = {
-#     "type": "object",
-#     "properties": {
-#         "reasoning": {
-#             "type": "string",
-#             "minLength": 150,
-#             "maxLength": 1400,  # character limit, not token count -- see note below
-#         },
-#         "predict_popularity_score": {
-#             "type": "string",
-#             "pattern": "^[0-9]+$",
-#         },
-#     },
-#     "required": ["reasoning", "predict_popularity_score"],
-#     "additionalProperties": False,
-# }
 
 OUTPUT_JSON_SCHEMA = {
     "type": "object",
