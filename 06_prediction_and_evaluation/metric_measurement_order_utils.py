@@ -1,7 +1,5 @@
 """
 Order related utility functions for metric measurement in recommendation tasks.
-
-Date: 2025-06-27
 """
 
 
