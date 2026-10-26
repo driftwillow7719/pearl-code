@@ -161,8 +161,8 @@ def main():
     save_datasets(final_test,"test_set")
     
     # print("Train Data Size: ", final_train.shape)
-    validation_ground_truth.to_csv("test_validation/q3/sgt/inter_val_set.csv",index=False)
-    test_ground_truth.to_csv("test_validation/q3/sgt/inter_test_set.csv",index=False)
+    validation_ground_truth.to_csv("inter_val_set.csv",index=False)
+    test_ground_truth.to_csv("inter_test_set.csv",index=False)
 
 # run
 if __name__ == "__main__":
