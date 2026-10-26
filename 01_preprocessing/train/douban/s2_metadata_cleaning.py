@@ -9,9 +9,9 @@ DOUBAN_TZ = ZoneInfo("Asia/Shanghai")
 def data_loading():
     movie_metadata = pd.read_excel('raw_dataset/douban_movie_info_all.xlsx')
     imdb_movie_connector = pd.read_csv("raw_dataset/movie_meta_2w_transed_final.csv")
-    train_pop = pd.read_excel('popularity_inputs/q3/sgt/processed_popularity_train_data.xlsx')
-    val_pop=pd.read_excel('popularity_inputs/q3/sgt/processed_popularity_val_data.xlsx')
-    test_pop=pd.read_excel('popularity_inputs/q3/sgt/processed_popularity_test_data.xlsx')
+    train_pop = pd.read_excel('.../processed_popularity_train_data.xlsx')
+    val_pop=pd.read_excel('.../processed_popularity_val_data.xlsx')
+    test_pop=pd.read_excel('.../processed_popularity_test_data.xlsx')
     return movie_metadata, imdb_movie_connector,train_pop,val_pop,test_pop
 
 # ==================== BASIC CLEANING AND MERGING ====================
