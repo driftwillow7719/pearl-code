@@ -35,19 +35,6 @@ RANK_WEIGHTS = {
     3: [0.50, 0.30, 0.20],
 }
 
-# RANK_WEIGHTS = {
-#     1: [1.0],              # debut's only ever-selected feature: embed_similarity
-#     2: [0.30, 0.70],
-#     3: [0.20, 0.30, 0.50],
-# }
-
-# xtreme weights (best overall)
-# RANK_WEIGHTS = {
-#     1: [1.0],              # debut's only ever-selected feature: embed_similarity
-#     2: [0.85, 0.15],
-#     3: [0.40, 0.35, 0.20],
-# }
-
 # reproducible/comparable across runs
 ALL_CANDIDATE_FEATURES = [
     "latest_pop_value", "item_age", "trend_min", "trend_max",
