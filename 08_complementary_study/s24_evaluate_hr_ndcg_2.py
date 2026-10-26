@@ -8,12 +8,11 @@ Two ground-truth modes:
 
 1. --test_interactions_path (RECOMMENDED for home_and_kitchen):
    Ground truth already in the SAME user_id/item_id space as the combined
-   score files (e.g. HGN/test_interactions.csv or LLMESR/test_interactions.csv
-   from the personalized models' export -- both files are identical). No old-ID
-   translation needed, so no users get excluded for ambiguous mapping.
-   Validated against the personalized models' own reported results for
-   both HGN and LLM-ESR (hr@k / ndcg@k match to float precision) on the
-   full 6,437-user cohort.
+   score files (e.g. SASRec/test_interactions.csv from the personalized
+   model's export). No old-ID translation needed, so no users get
+   excluded for ambiguous mapping. Validated against the personalized
+   model's own reported results (hr@k / ndcg@k match to float precision)
+   on the full 6,437-user cohort.
 
 2. Legacy multi-category mode (--category + --interaction_path +
    --user_mapping_path): ground truth in the OLD raw ID space, needs
@@ -28,7 +27,7 @@ Results are written incrementally (appended per file as each finishes).
 
 Usage (direct mode, home_and_kitchen):
     python s24_evaluate_hr_ndcg_2.py \
-        --test_interactions_path HGN/test_interactions.csv \
+        --test_interactions_path SASRec/test_interactions.csv \
         --combined_glob "deepseek_flash_output/amazon_home_and_kitchen/combined_kitchen_*.csv.gz" \
         --combined_id_col item_id \
         --out_path deepseek_flash_output/amazon_home_and_kitchen/pare_hr_ndcg_results_kitchen.csv
@@ -60,7 +59,6 @@ def load_targets_direct(test_interactions_path: str) -> dict:
     space (test_interactions.csv). No old-ID mapping needed, no
     users excluded -- every user in the score export has a target set here.
     """
-    # df = pd.read_csv(test_interactions_path)
     df = pd.read_csv(test_interactions_path, dtype={"user_id": str, "item_id": str})
     print(f"[direct ground truth] loaded {len(df)} rows, {df['user_id'].nunique()} users, "
           f"from {test_interactions_path}")
@@ -146,7 +144,7 @@ def load_user_mapping(mapping_path: str) -> dict:
 def build_rankings(combined: pd.DataFrame, id_col: str, user_map: dict | None) -> dict:
     """combined: 1 (model, beta) slice, already sorted by rank_in_user (which
     s23_score_mixture_multidataset.py builds with ties broken by ascending
-    original_item_id, matching the models' tie_policy).
+    original_item_id, matching the model's tie_policy).
 
     Returns dict: target-space user_id -> ordered list of item ids
     (highest s_new first). If user_map is None (direct mode), the
@@ -167,7 +165,6 @@ def build_rankings(combined: pd.DataFrame, id_col: str, user_map: dict | None) -
 # ── evaluate one combined-score file ─────────────────────────────────────
 
 def evaluate_one_file(path: str, targets: dict, cutoffs: list, id_col: str, user_map: dict | None):
-    # combined = pd.read_csv(path, compression="gzip")
     combined = pd.read_csv(path, compression="gzip", dtype={"user_id": str, "item_id": str})
     fname = path.split("/")[-1]
     m_variant = re.search(r"combined_\w+?_(.+?)_pare", fname)
@@ -217,7 +214,7 @@ def parse_args():
     # direct mode (preferred for home_and_kitchen)
     p.add_argument("--test_interactions_path", default=None,
                     help="Ground truth CSV (user_id,item_id,...) already in the combined files' "
-                         "current ID space, e.g. HGN/test_interactions.csv. When set, this bypasses "
+                         "current ID space, e.g. SASRec/test_interactions.csv. When set, this bypasses "
                          "--category/--interaction_path/--user_mapping_path entirely and no users "
                          "are excluded for ambiguous ID mapping.")
 
