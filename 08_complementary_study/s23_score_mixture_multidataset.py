@@ -1,15 +1,14 @@
 """
 PARE-style method integration: combine personalized user-item preference
-scores (HGN / LLM-ESR) with a non-personalized popularity score, following
+scores (SASRec) with a non-personalized popularity score, following
 Eq. 12:
 
     s_new(u, i, T) = beta * s(u, i) + (1 - beta) * y_hat_F
 
-Score sources (exports of the personalized models):
-    HGN/user_item_scores.csv.gz     -- columns: user_id, item_id, original_item_id, hgn_score
-    LLMESR/user_item_scores.csv.gz  -- columns: user_id, item_id, original_item_id, llmesr_score
+Score source (export of the personalized model):
+    SASRec/user_item_scores.csv.gz  -- columns: user_id, item_id, original_item_id, sasrec_score
 
-Normalization: hgn_score / llmesr_score are min-max normalized GLOBALLY
+Normalization: sasrec_score is min-max normalized GLOBALLY
 (across the whole score set), not per user -- preserves the original
 relative scale of scores across users.
 
@@ -23,7 +22,7 @@ the old inner-join + dropna behavior if you specifically need it.
 
 Tie-breaking: within a user, ties in s_new are broken by ascending
 original_item_id (tie_policy="ascending_original_item_id"), which reproduces
-the personalized models' own reported baseline numbers.
+the personalized model's own reported baseline numbers.
 
 Usage:
     python s23_score_mixture_multidataset.py --popularity_col norm_predict_popularity_score
@@ -34,12 +33,11 @@ import pandas as pd
 import numpy as np
 
 # ---------------- DEFAULT CONFIG (overridable via CLI) ----------------
-HGN_SCORES_PATH = "deepseek_flash_output/amazon_home_and_kitchen/HGN/user_item_scores.csv.gz"
-LLMESR_SCORES_PATH = "deepseek_flash_output/amazon_home_and_kitchen/LLMESR/user_item_scores.csv.gz"
+SASREC_SCORES_PATH = "deepseek_flash_output/amazon_home_and_kitchen/SASRec/user_item_scores.csv.gz"
 POPULARITY_SCORES_PATH = "deepseek_flash_output/amazon_home_and_kitchen/home_and_kitchen_k5_full_final_ranking.csv"
 OUT_DIR = "deepseek_flash_output/amazon_home_and_kitchen"
 
-PERSONALIZED_SCORE_COLS = ["hgn_score", "llmesr_score"]
+PERSONALIZED_SCORE_COLS = ["sasrec_score"]
 DEFAULT_BETAS = "0,0.05,0.1,0.3,0.5,0.7,0.9,1.0"
 ID_COLS = ["user_id", "item_id", "original_item_id"]
 
@@ -57,28 +55,12 @@ def min_max_normalize_global(df: pd.DataFrame, score_col: str) -> pd.Series:
     return (df[score_col] - col_min) / denom
 
 
-def load_personalized_scores(hgn_path: str, llmesr_path: str) -> pd.DataFrame:
-    """Load + merge the two raw per-model score exports into one wide table
-    with both hgn_score and llmesr_score. These come from the same cohort
-    and candidate set, so this should be a clean 1:1 merge -- a mismatch
-    here means the two exports aren't aligned (different cohort/run) and
-    needs checking before going any further.
+def load_personalized_scores(sasrec_path: str) -> pd.DataFrame:
+    """Load the raw personalized model score export.
     """
-    hgn = pd.read_csv(hgn_path, compression="gzip")
-    llmesr = pd.read_csv(llmesr_path, compression="gzip")
-    print(f"[load] HGN: {len(hgn)} rows, {hgn['user_id'].nunique()} users")
-    print(f"[load] LLM-ESR: {len(llmesr)} rows, {llmesr['user_id'].nunique()} users")
-
-    merged = hgn.merge(llmesr, on=ID_COLS, how="inner", validate="one_to_one")
-    expected = max(len(hgn), len(llmesr))
-    dropped = expected - len(merged)
-    if dropped:
-        print(f"[warn] {dropped} / {expected} rows didn't align between HGN and LLM-ESR score "
-              f"files on {ID_COLS} -- check these really are the same cohort/candidate export")
-    else:
-        print(f"[ok] HGN and LLM-ESR scores align 1:1 on {ID_COLS}: "
-              f"{len(merged)} rows, {merged['user_id'].nunique()} users")
-    return merged
+    sasrec = pd.read_csv(sasrec_path, compression="gzip")
+    print(f"[load] SASRec: {len(sasrec)} rows, {sasrec['user_id'].nunique()} users")
+    return sasrec
 
 
 def join_popularity(
@@ -132,8 +114,8 @@ def iter_combined_scores(
 ):
     """Yields (model_name, beta, out_df) one (model, beta) combination at a
     time, instead of materializing every combination in memory at once --
-    with many betas this cartesian product gets huge fast (e.g. 31.6M rows
-    x 2 models x 7 betas = ~440M rows), easily OOMing even on a beefy box.
+    with many betas this cartesian product gets huge fast, easily OOMing
+    even on a beefy box.
     """
     for model_col in personalized_cols:
         model_name = model_col.replace("_score", "")
@@ -166,8 +148,7 @@ def iter_combined_scores(
 
 def parse_args():
     p = argparse.ArgumentParser(description="Combine personalized + popularity scores (PARE-style).")
-    p.add_argument("--hgn_scores_path", default=HGN_SCORES_PATH)
-    p.add_argument("--llmesr_scores_path", default=LLMESR_SCORES_PATH)
+    p.add_argument("--sasrec_scores_path", default=SASREC_SCORES_PATH)
     p.add_argument("--popularity_scores_path", default=POPULARITY_SCORES_PATH)
     p.add_argument("--out_dir", default=OUT_DIR)
     p.add_argument(
@@ -191,7 +172,7 @@ def parse_args():
                     help="y_hat_F for items with no popularity score, when not dropping them.")
     p.add_argument(
         "--popularity_join_col", default="original_item_id",
-        help="Column in the HGN/LLM-ESR score files to join popularity_scores' item_id "
+        help="Column in the SASRec score file to join popularity_scores' item_id "
              "against. Kitchen: 'original_item_id' (default). Baby/Douban (converted via "
              "convert_npz_to_long.py): 'item_id' -- their 'original_item_id' is the internal "
              "model item id (tie-break only), not the catalog id.",
@@ -208,7 +189,7 @@ if __name__ == "__main__":
     args = parse_args()
     betas = [float(b) for b in args.betas.split(",")]
 
-    user_item_scores = load_personalized_scores(args.hgn_scores_path, args.llmesr_scores_path)
+    user_item_scores = load_personalized_scores(args.sasrec_scores_path)
     popularity_scores = pd.read_csv(args.popularity_scores_path)
 
     merged = join_popularity(
@@ -222,18 +203,17 @@ if __name__ == "__main__":
     del user_item_scores, popularity_scores
     gc.collect()
 
-    # one output file PER BETA (both models in the same per-beta file) --
-    # not one giant file with every beta stacked together. With many betas
-    # the single-file version balloons into tens of GB on disk, and
-    # s24_evaluate_hr_ndcg_2.py loads a combined file fully into memory
-    # (pd.read_csv), so a single 500M-row file risks OOM even on a big
-    # node. One file per beta keeps each read to a manageable size, and a
-    # failed/interrupted beta doesn't take the rest down with it.
+    # one output file PER BETA -- not one giant file with every beta
+    # stacked together. With many betas the single-file version balloons
+    # into tens of GB on disk, and s24_evaluate_hr_ndcg_2.py loads a
+    # combined file fully into memory (pd.read_csv), so a single
+    # 500M-row file risks OOM even on a big node. One file per beta keeps
+    # each read to a manageable size, and a failed/interrupted beta
+    # doesn't take the rest down with it.
     def out_path_for(beta):
         return f"{args.out_dir}/combined_{args.dataset_name}_pare_{args.popularity_col}_beta_{beta}.csv.gz"
 
-    header_written = {}  # beta -> bool, since models for the same beta
-                          # arrive in separate passes (outer loop is model)
+    header_written = {}
     rows_per_file = {}
     seen_users_per_file = {}
     total_rows = 0
