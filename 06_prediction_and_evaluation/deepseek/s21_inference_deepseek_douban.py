@@ -53,7 +53,7 @@ def load_retrieval_csv(k):
     return df
 
 
-# ── Friend-format alignment helpers (unchanged from s21_inference_vllm_qwen_douban.py) ──
+# ── Movie description helpers (same as in s21_inference_vllm_qwen_douban.py) ──
 
 def _fallback_na(value):
     """Return 'NA' for missing/empty values, else the value as-is."""
@@ -77,8 +77,7 @@ def capitalize_names(text):
 
 
 def build_movie_description(row):
-    """Reproduce the friend's exact MovieDescription template from our
-    structured columns."""
+    """Build the MovieDescription text from the structured columns."""
     movie_name = _fallback_na(row.get("movie_name"))
     release_date = _fallback_na(row.get("release_date"))
     genre = _fallback_na(row.get("genre"))
