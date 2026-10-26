@@ -1,4 +1,4 @@
-FEATURE SELECTOR LLM -- INSTRUCTION PROMPT (v5)
+FEATURE SELECTOR LLM -- INSTRUCTION PROMPT
 ==================================================
 
 This prompt is split into two parts for prompt-caching efficiency: a
@@ -8,14 +8,6 @@ TURN TEMPLATE (the only part that changes per call -- the specific query
 item's own feature values). Send the SYSTEM PROMPT block verbatim and
 identically on every request so the cache can reuse it; only the USER TURN
 content should vary between calls.
-
-v5 CHANGE NOTE: this version replaces the 8-group context summary and the
-pairwise-discrimination section of v4 with the full narrative write-ups
-from the underlying analysis document (its Part 1 per-group write-ups and
-Part 2 pairwise discrimination), rather than that document's compact
-digest (its Part 3). All other sections (role, candidate features, special
-case, general steps, output format, user turn template) are unchanged from
-v4.
 
 ===============================================================================
 SYSTEM PROMPT (static -- identical on every call)
