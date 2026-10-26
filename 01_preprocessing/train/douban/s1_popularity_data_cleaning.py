@@ -54,11 +54,10 @@ def clean_metadata(meta_dataset):
     filtered_meta_subset_unique=filtered_meta_subset_month.drop_duplicates()
     return filtered_meta_subset_unique
 
-def _sgt_unix_timestamp(date_str):
+def _unix_timestamp(date_str):
     """Parse a 'YYYY-MM-DD' string as DOUBAN_TZ midnight and return its Unix
-    epoch seconds -- mirrors your friend's approach, but pinned explicitly
-    to Asia/Shanghai instead of relying on the running machine's local
-    timezone (which is what datetime.strptime(...).timestamp() actually does)."""
+    epoch seconds, pinned explicitly to Asia/Shanghai instead of relying on the
+    running machine's local timezone."""
     return datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=DOUBAN_TZ).timestamp()
 
 def dataset_cut(dataset):
@@ -69,18 +68,17 @@ def dataset_cut(dataset):
     end_date_val = '2019-11-01'
     end_date_test = '2019-12-01'
 
-    ts_start_train = _sgt_unix_timestamp(start_date_train)
-    ts_end_train = _sgt_unix_timestamp(end_date_train)
-    ts_start_val = _sgt_unix_timestamp(start_date_val)
-    ts_end_val = _sgt_unix_timestamp(end_date_val)
-    ts_end_test = _sgt_unix_timestamp(end_date_test)
+    ts_start_train = _unix_timestamp(start_date_train)
+    ts_end_train = _unix_timestamp(end_date_train)
+    ts_start_val = _unix_timestamp(start_date_val)
+    ts_end_val = _unix_timestamp(end_date_val)
+    ts_end_test = _unix_timestamp(end_date_test)
     
     train_subset = dataset[(dataset['Time'] >= ts_start_train) & (dataset['Time'] < ts_end_train)]
     validation_subset = dataset[(dataset['Time'] >= ts_start_train) & (dataset['Time'] < ts_end_val)]
     validation_ground_truth = dataset[(dataset['Time'] >= ts_start_val) & (dataset['Time'] < ts_end_val)]
     test_subset = dataset[(dataset['Time'] >= ts_start_train) & (dataset['Time'] < ts_end_test)]
-    # This is the split that must match your friend's `user_current_df`
-    # (Nov 2019 test/target interactions): [2019-11-01 00:00 DOUBAN_TZ, 2019-12-01 00:00 DOUBAN_TZ)
+    # Nov 2019 target interactions: [2019-11-01 00:00 DOUBAN_TZ, 2019-12-01 00:00 DOUBAN_TZ)
     test_ground_truth = dataset[(dataset['Time'] >= ts_end_val) & (dataset['Time'] < ts_end_test)]
     return train_subset, validation_subset, test_subset, validation_ground_truth, test_ground_truth
 
@@ -161,8 +159,8 @@ def main():
     save_datasets(final_test,"test_set")
     
     # print("Train Data Size: ", final_train.shape)
-    validation_ground_truth.to_csv("inter_val_set.csv",index=False)
-    test_ground_truth.to_csv("inter_test_set.csv",index=False)
+    validation_ground_truth.to_csv("test_validation/q3/sgt/inter_val_set.csv",index=False)
+    test_ground_truth.to_csv("test_validation/q3/sgt/inter_test_set.csv",index=False)
 
 # run
 if __name__ == "__main__":
