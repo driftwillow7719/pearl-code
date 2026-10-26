@@ -1,4 +1,4 @@
-FEATURE SELECTOR LLM -- INSTRUCTION PROMPT (v5)
+FEATURE SELECTOR LLM -- INSTRUCTION PROMPT
 ==================================================
 
 This prompt is split into two parts for prompt-caching efficiency: a
@@ -9,8 +9,8 @@ item's own feature values). Send the SYSTEM PROMPT block verbatim and
 identically on every request so the cache can reuse it; only the USER TURN
 content should vary between calls.
 
-G0 VARIANT NOTE (ablation): this is the v5 prompt with ALL statistical guidance
-removed -- no 8-group context summary, no pairwise-discrimination section, no
+G0 VARIANT NOTE (ablation): ALL statistical guidance removed
+no 8-group context summary, no pairwise-discrimination section, no
 debut note, and no steps that depend on them. Kept: role, candidate-feature
 definitions, the RECENT_SINGLE_POINT rule, redundancy rule, output format, and
 the per-query user turn (including its precomputed embed_similarity values).
