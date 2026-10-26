@@ -1,5 +1,6 @@
 """
-Douban Prediction File
+Douban for GPT4o mini Prediction File
+
 """
 import json
 import os
@@ -109,11 +110,10 @@ def load_retrieval_csv(k):
 
     return df
 
-# ── Friend-format alignment helpers ─────────────────────────────────────
+# ── Movie description helpers ─────────────────────────────────────
 
 def _fallback_na(value):
-    """Return 'NA' for missing/empty values, else the value as-is (matching
-    his observed 'written by NA' fallback convention)."""
+    """Return 'NA' for missing/empty values, else the value as-is."""
     if value is None:
         return "NA"
     if isinstance(value, float) and pd.isna(value):
@@ -137,12 +137,11 @@ def capitalize_names(text):
 
 
 def build_movie_description(row):
-    """Reproduce the friend's exact MovieDescription template from our
-    structured columns:
-      movie_name, release_date, genre, description (his "synopsis"),
+    """Build the MovieDescription text from the structured columns:
+      movie_name, release_date, genre, description ("synopsis"),
       language, director, writers, top5_actors, producers.
-    We have no music/composer column, so that clause always renders "NA"
-    (following the same NA-fallback convention he uses for a missing writer).
+    There is no music/composer column, so that clause always renders "NA"
+    (the same NA fallback is used for a missing writer).
 
     Example target:
     "The movie Maleficent: Mistress of Evil (2019) is a Fantasy, Adventure
@@ -245,7 +244,8 @@ def build_target_item_block(row, inference_month_str):
 
 def prepare_batch_input(df, model, variant_tag, inference_month_str,
                          include_retrieval=True, output_dir="."):
-# Simple Prompt V5 (stripped direction and popularity tiers) + no indication which one is most similar, but sorted ascending
+
+# Prediction Prompt
     system_prompt = """You are an expert movie popularity analyst. Your task is to predict a movie's popularity score at a given point in time, based on its own
 descriptive features, its historical popularity trajectory (when available), and a set of retrieved past movies with similar description and popularity patterns.
 
