@@ -1,28 +1,5 @@
 """
-Samples ~N items (default 100) as evenly as possible across the 8
-(pop_cluster, pop_direction) ground-truth outcome groups -- e.g. for
-building a held-out test batch to evaluate the LLM group-selection prompt.
-
-Handles two real constraints instead of naively doing df.groupby(...).sample(n):
-
-  1. The 8 groups are NOT all equally sized -- high_popular__stable has
-     only 8 total members in your training data, so it can never supply an
-     even 1/8 share of a 100-item sample (100/8 ~= 12.5) without either
-     capping at 8 or sampling with replacement (not done here -- repeats
-     would defeat the point of a held-out test batch).
-  2. zero_popular has no "increase" members at all -- there are 8
-     populated groups, not 9.
-
-Strategy: give every group an equal base target (target_total // n_groups,
-with the remainder spread across groups), take min(target, available) from
-each group, then redistribute any shortfall (caused by small groups like
-high_popular__stable capping out) across groups that still have spare
-capacity, so the final sample still totals as close to target_total as
-possible without duplicating rows.
-
-Also excludes debut items by default, matching how the 8 groups were
-originally defined in the correlation study (most characteristics are
-undefined/degenerate for true cold-start items).
+Attaching ground truth (Douban)
 """
 import os
 import sys
@@ -156,8 +133,8 @@ def sample_balanced_groups(df, group_cols=('ground_truth_pop_cluster', 'ground_t
 
 
 if __name__ == "__main__":
-    # INTER_PATH = "test_validation/q3/utc/inter_test_set.csv"
-    INTER_PATH = "test_validation/q3/utc/inter_val_set.csv"
+    # INTER_PATH = ".../inter_test_set.csv"
+    INTER_PATH = ".../inter_val_set.csv"
     # TARGET_MONTH = '2019-11'
     TARGET_MONTH = '2019-10'
     TARGET_SAMPLE = 100
@@ -166,18 +143,8 @@ if __name__ == "__main__":
     # INF_EMBED_DATA_PATH = "260826_test_embed/final_embeddings.npy"
     INF_EMBED_DATA_PATH = "260828_val_embed/final_embeddings.npy"
 
-    
-    print("Usage:")
-    print("  dataset = pd.read_csv('your_dataset_with_pop_cluster_and_pop_direction.csv')")
-    print("  sample_df, summary_df = sample_balanced_groups(dataset, target_total=100)")
-    print("  sample_df.to_csv('balanced_100_sample.csv', index=False)")
-    print()
-    print("  # summary_df shows, per group: how many were available, how many were")
-    print("  # targeted, and how many were actually taken -- check this to see which")
-    print("  # groups (almost certainly high_popular__stable, n=8) capped out and had")
-    print("  # their shortfall redistributed elsewhere.")
     subset_df, embed = inf_data_loading(INF_DATA_PATH, INF_EMBED_DATA_PATH)
     dataset = attach_ground_truth_direction(subset_df, INTER_PATH, TARGET_MONTH, id_col='movie_id') 
     dataset['ground_truth_popularity_score'] = dataset['ground_truth_popularity_score'].astype("Int64")
     # sample_df, summary_df = sample_balanced_groups(dataset, target_total=TARGET_SAMPLE)
-    dataset.to_csv('dataset/q3/260826/val_with_gt/260828_full_val_set.csv', index=False)
+    dataset.to_csv('.../260828_full_val_set.csv', index=False)
