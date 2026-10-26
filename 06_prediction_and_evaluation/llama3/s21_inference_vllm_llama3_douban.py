@@ -2,7 +2,7 @@
 Douban (movie) vLLM batch inference client -- Llama-3-8B variant.
 
 Run, e.g.:
-    python3 s21_inference_vllm_llama3_douban.py                        
+    python3 s21_inference_vllm_llama3_douban.py                       
     SEED=1 OUTPUT_DIR=llama_3_8b_output/douban_movies/run_1 python3 s21_inference_vllm_llama3_douban.py
     SEED=2 OUTPUT_DIR=llama_3_8b_output/douban_movies/run_2 python3 s21_inference_vllm_llama3_douban.py
     SEED=3 OUTPUT_DIR=llama_3_8b_output/douban_movies/run_3 python3 s21_inference_vllm_llama3_douban.py
@@ -18,7 +18,6 @@ from transformers import AutoTokenizer
 
 # ── CONFIG ────────────────────────────────────────────────────────────────
 RETRIEVAL_CSV_TEMPLATE = (
-    # "synthetic_data_generation/260827/260828_test/gpt4o/0904_full_simple_prompt_v4/mapping_k{k}_a50_b50_sig1_gtcase1_gtprior1.csv"
     "0911_douban_test_retrieved_format/retrieval_context_per_query_embed_rerank_k{k}_a50_b50_sig1_gtcase1_gtprior0_simscore0.csv"
 )
 _TREND_ARRAY_SPLIT_PATTERN = re.compile(r"[,\s]+")
@@ -194,7 +193,7 @@ def load_retrieval_csv(k):
     return df
 
 
-# ── Friend-format alignment helpers ─────────────────────────────────────
+# ── Movie description helpers ─────────────────────────────────────
 
 def _fallback_na(value):
     """Return 'NA' for missing/empty values, else the value as-is."""
@@ -218,8 +217,7 @@ def capitalize_names(text):
 
 
 def build_movie_description(row):
-    """Reproduce the friend's exact MovieDescription template from our
-    structured columns."""
+    """Build the MovieDescription text from the structured columns."""
     movie_name = _fallback_na(row.get("movie_name"))
     release_date = _fallback_na(row.get("release_date"))
     genre = _fallback_na(row.get("genre"))
