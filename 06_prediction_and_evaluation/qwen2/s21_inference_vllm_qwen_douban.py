@@ -1,77 +1,49 @@
 """
-Amazon (baby / home_and_kitchen) adaptation of the Qwen2-7B variant
+Douban (movie) vLLM batch inference client -- Qwen2-7B-Inst variant
 
-Run per category, e.g.:
-    python3 s21_inference_vllm_qwen_amazon.py --category baby
-    python3 s21_inference_vllm_qwen_amazon.py --category home_and_kitchen --model qwen2-7b
+Run, e.g.:
+    python3 s21_inference_vllm_qwen_douban.py                    
+    SEED=1 OUTPUT_DIR=qwen2_7b_output/douban_movies/run_1 python3 s21_inference_vllm_qwen_douban.py
+    SEED=2 OUTPUT_DIR=qwen2_7b_output/douban_movies/run_2 python3 s21_inference_vllm_qwen_douban.py
+    SEED=3 OUTPUT_DIR=qwen2_7b_output/douban_movies/run_3 python3 s21_inference_vllm_qwen_douban.py
 """
-import argparse
 import csv
 import json
 import os
+import re
+import numpy as np
 import pandas as pd
 import requests as http
 from transformers import AutoTokenizer
 
-import os as _os
-import sys as _sys
-_sys.path.insert(0, _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "gpt4omini"))
-from s18_prepare_for_prediction_amazon import (
-
-    build_target_item_block,
-    # PRODUCT_SYSTEM_PROMPT,
-    load_retrieval_csv,
-    _resolve_inference_month,
-)
-
 # ── CONFIG ────────────────────────────────────────────────────────────────
-PRODUCT_SYSTEM_PROMPT = """You are an expert e-commerce product popularity analyst. Your task is to predict a product's popularity score at a given point in time, based on its own
-descriptive features, its historical popularity trajectory (when available), and a set of retrieved past products with similar description and popularity patterns.
+RETRIEVAL_CSV_TEMPLATE = (
+    # "synthetic_data_generation/260827/260828_test/gpt4o/0904_full_simple_prompt_v4/mapping_k{k}_a50_b50_sig1_gtcase1_gtprior1.csv"
+    "0911_douban_test_retrieved_format/retrieval_context_per_query_embed_rerank_k{k}_a50_b50_sig1_gtcase1_gtprior0_simscore0.csv"
+)
+_TREND_ARRAY_SPLIT_PATTERN = re.compile(r"[,\s]+")
 
-### About <PopularityHistory>:
-<PopularityHistory> covers the target's own monthly popularity values from
-release through one month before <InferenceTimestamp> -- it does not
-include the value at <InferenceTimestamp> itself, which is what you are
-being asked to predict.
+K_VALUES = [1,5,10]
 
-### About <SimilarPastItems>:
-<SimilarPastItems> shows past products retrieved for similar description and
-popularity pattern -- they will not necessarily match the target's outcome.
-For non-debut items, each item's own trend line covers its own history up through one month before its own outcome month; its outcome is stated only as a relative percentage change from that trend's last value (never the raw outcome number itself), showing how much the observed popularity moved.
-For debut items, neither a trend line nor an outcome value is provided, since there is no prior popularity history -- only its own product description and explanatory factors are available for these cases.
+# ── Model / backend config ──────────────────────────────────────────────
+MODEL = "qwen2-7b-instruct"    # must match the --model/positional arg vLLM was started with
+# VLLM_HOST = "http://localhost:8001"
+VLLM_PORT = os.environ.get("VLLM_PORT", "8000")
+VLLM_HOST = f"http://localhost:{VLLM_PORT}"
 
-Steps:
-1. First, estimate the target's popularity score using only <ProductDescription>
-   and <PopularityHistory> (when available). It's a specific number, not a category label.
-2. Then review <SimilarPastItems>. For each retrieved item, check whether
-   its trend trajectory and explanatory factors -- covering both its own
-   product description and its own popularity history -- are actually
-   applicable to the target item. Use this review to adjust your step 1
-   estimate up, down, or keep it stable. Repeated factors across items
-   count as one signal, not reinforcement.
-
-Output a single, valid JSON object with exactly these two keys:
-
-- `reasoning`: must cover two things, in order -- (1) your step 1 initial
-  estimate and what it's based on, and (2) your justification for the
-  final predict_popularity_score, including whether and why
-  <SimilarPastItems> moved it up, down, or left it unchanged from that
-  initial estimate.
-- `predict_popularity_score`: your final predicted popularity score at the
-  given <InferenceTimestamp>. A non-negative number, formatted as a string
-  (decimals are allowed, do not strip the decimal point or round to an integer).
-
-Output only this JSON object, with nothing before or after.
-
-### Input format:
-
-<ProductDescription>...</ProductDescription>
-<PopularityHistory>...</PopularityHistory>
-<InferenceTimestamp>...</InferenceTimestamp>
-<SimilarPastItems>...</SimilarPastItems>
-"""
-
-NO_RETRIEVAL_FALLBACK = "No similar past items provided."
+# Per-request RNG seed forwarded to vLLM -- set via `SEED=<int> python3 ...`.
+# Left unset (None), vLLM uses its default RNG state, which is typically the
+# SAME across independent server launches: replicate runs will come back
+# byte-identical despite temperature=0.1. Pass a DIFFERENT SEED per
+# replicate run (1, 2, 3, ...) to get genuine run-to-run variance.
+SEED = os.environ.get("SEED")
+SEED = int(SEED) if SEED not in (None, "") else None
+if SEED is None:
+    print("WARNING: SEED env var not set -- vLLM will use its default RNG state, "
+          "which is typically the SAME across independent server launches. If "
+          "this is one of several replicate runs, set SEED=1/2/3/... per run "
+          "(and update OUTPUT_DIR below to match) or they will come back "
+          "byte-identical.")
 
 # OUTPUT_JSON_SCHEMA = {
 #     "type": "object",
@@ -107,15 +79,23 @@ OUTPUT_JSON_SCHEMA = {
     "additionalProperties": False,
 }
 
-# Qwen2-7B natively supports up to 32768 tokens, far more than needed --
-# capped here to match Llama-2's (RoPE-extended) context budget for a fair
-# apples-to-apples comparison between the two models. No RoPE/YaRN scaling
-# needed for Qwen2 at this length.
-MAX_MODEL_LEN = 8192
-SAFETY_MARGIN = 50
-MAX_TOKENS_CEILING = 1600
-# ── END CONFIG ────────────────────────────────────────────────────────────
+# Overridable via `OUTPUT_DIR=<path> python3 ...` (same pattern as SEED/
+# VLLM_PORT above) so a PBS job script can point each replicate run at its
+# own folder via `qsub -v OUTPUT_DIR=...` without hand-editing this file
+# between submissions.
+OUTPUT_DIR = os.environ.get("OUTPUT_DIR", "qwen2_7b_output/douban_movies/run_1")
+NO_RETRIEVAL_FALLBACK = "No similar past items provided."
+INFERENCE_MONTH_STR = "2019-11"  # test-set prediction time, fixed for this whole run
+# SMOKE_TEST_MOVIE_IDS = [
+#     27119724, 30166972, 30402296, 27109633, 25887288,
+#     30299311, 26786669, 30318116, 30362186, 33400376,
+#     30390144, 3097572, 26794435, 30413052, 26612258,
+#     27010768, 6981153, 26715636, 30272143, 25779217, 30295905, 32659890,
+#     26235346, 26426056, 27595272, 30327842, 30282387
+# ]
 
+
+_tokenizer = AutoTokenizer.from_pretrained(MODEL)
 
 def build_emoji_logit_bias(tokenizer, bias_value=-100):
     """Ban the byte-fallback tokens that start a 4-byte UTF-8 sequence
@@ -125,7 +105,7 @@ def build_emoji_logit_bias(tokenizer, bias_value=-100):
     tokenizer that may not expose the same '<0xF0>'-style token strings --
     if none of these are found in Qwen2's vocab, `bias` will come back
     empty and this mechanism will do nothing (silently, not an error).
-    See the startup warning in main()."""
+    See the startup warning below."""
     vocab = tokenizer.get_vocab()
     bias = {}
     for lead_byte in ["0xF0", "0xF1", "0xF2", "0xF3", "0xF4"]:
@@ -134,10 +114,250 @@ def build_emoji_logit_bias(tokenizer, bias_value=-100):
             bias[str(vocab[token_str])] = bias_value
     return bias
 
+EMOJI_LOGIT_BIAS = build_emoji_logit_bias(_tokenizer)
+if not EMOJI_LOGIT_BIAS:
+    print("WARNING: EMOJI_LOGIT_BIAS is empty -- Qwen2's tokenizer doesn't "
+          "expose '<0xF0>'-style byte tokens the way Llama-2's does. Emoji "
+          "banning via logit_bias will have NO effect for this model. If "
+          "emoji/symbol issues show up in Qwen2 outputs, this needs a "
+          "different approach (e.g. banning specific emoji token ids "
+          "directly, found by tokenizing sample emoji and inspecting ids).")
+# print(EMOJI_LOGIT_BIAS)
+# ── END CONFIG ────────────────────────────────────────────────────────────
 
-def prepare_batch_input(df, model, variant_tag, inference_month_str, tokenizer,
-                         emoji_logit_bias, include_retrieval=True, output_dir=".",
-                         description_col="product_description", seed=None):
+
+def parse_center_name(center_name):
+    """'high_popular__decrease' -> ('high_popular', 'decrease'). Returns
+    (None, None) for anything unparseable (e.g. a scoring error row)."""
+    if not isinstance(center_name, str) or "__" not in center_name:
+        return None, None
+    pop_cluster, direction = center_name.split("__", 1)
+    return pop_cluster, direction
+
+
+def sample_equal_per_direction(
+    df: pd.DataFrame,
+    target_n: int,
+    target_high_pop: int = 10,
+    cluster_col: str = 'ground_truth_pop_cluster',
+    high_pop_val: str = 'high_popular',
+    random_state: int = 42
+) -> pd.DataFrame:
+    """
+    Samples target_n rows equalized across ground_truth_direction,
+    enforcing exactly `target_high_pop` total rows with high popularity cluster.
+    """
+    directions = ['increase', 'decrease', 'stable']
+    n_dirs = len(directions)
+
+    high_per_dir = target_high_pop // n_dirs
+    high_remainder = target_high_pop % n_dirs
+
+    tot_per_dir = target_n // n_dirs
+    tot_remainder = target_n % n_dirs
+
+    sampled_chunks = []
+
+    for i, d in enumerate(directions):
+        n_high_needed = high_per_dir + (1 if i < high_remainder else 0)
+        n_total_needed = tot_per_dir + (1 if i < tot_remainder else 0)
+        n_normal_needed = n_total_needed - n_high_needed
+
+        sub_dir = df[df['ground_truth_direction'] == d]
+
+        sub_high = sub_dir[sub_dir[cluster_col] == high_pop_val]
+        sub_normal = sub_dir[sub_dir[cluster_col] != high_pop_val]
+
+        if len(sub_high) <= n_high_needed:
+            sampled_high = sub_high
+        else:
+            sampled_high = sub_high.sample(n=n_high_needed, random_state=random_state)
+
+        if len(sub_normal) <= n_normal_needed:
+            sampled_normal = sub_normal
+        else:
+            sampled_normal = sub_normal.sample(n=n_normal_needed, random_state=random_state)
+
+        sampled_chunks.extend([sampled_high, sampled_normal])
+
+    return pd.concat(sampled_chunks).reset_index(drop=True)
+
+
+def load_retrieval_csv(k):
+    path = RETRIEVAL_CSV_TEMPLATE.format(k=k)
+    df = pd.read_csv(path)
+
+    df["trend_array"] = df["trend_array"].apply(
+        lambda x: np.array([int(i) for i in _TREND_ARRAY_SPLIT_PATTERN.split(x.strip("[]").strip()) if i])
+        if isinstance(x, str) else x
+    )
+
+    return df
+
+
+# ── Movie description helpers ─────────────────────────────────────
+
+def _fallback_na(value):
+    """Return 'NA' for missing/empty values, else the value as-is."""
+    if value is None:
+        return "NA"
+    if isinstance(value, float) and pd.isna(value):
+        return "NA"
+    text = str(value).strip()
+    if not text or text.lower() in {"nan", "none", "n/a"}:
+        return "NA"
+    return text
+
+
+def capitalize_names(text):
+    """Title-case a comma-separated list of person names, e.g.
+    'frank miller,robert rodriguez' -> 'Frank Miller, Robert Rodriguez'."""
+    if not isinstance(text, str) or text.strip().upper() == "NA":
+        return text
+    names = [name.strip().title() for name in text.split(",")]
+    return ", ".join(name for name in names if name)
+
+
+def build_movie_description(row):
+    """Build the MovieDescription text from the structured columns."""
+    movie_name = _fallback_na(row.get("movie_name"))
+    release_date = _fallback_na(row.get("release_date"))
+    genre = _fallback_na(row.get("genre"))
+    synopsis = _fallback_na(row.get("description"))
+    language = _fallback_na(row.get("language"))
+    director = capitalize_names(_fallback_na(row.get("director")))
+    writers = capitalize_names(_fallback_na(row.get("writers")))
+    top5_actors = _fallback_na(row.get("top5_actors"))
+    producers = _fallback_na(row.get("producers"))
+    music = _fallback_na(row.get("music"))  # no music/composer column available in this pipeline
+
+    return (
+        f"The movie {movie_name} is a {genre} film released in {release_date}. "
+        f"In this movie, {synopsis}. "
+        f"It is in {language}, directed by {director}, and written by {writers}. "
+        f"And the main actors (top-5) include {top5_actors}. "
+        f"The movie is produced by {producers} and the music is produced by {music}."
+    )
+
+def _month_label(date_value):
+    """'YYYY-MM' label for a date-like value, or None if missing/unparsable."""
+    if pd.isna(date_value):
+        return None
+    try:
+        return str(pd.Period(pd.Timestamp(date_value), freq="M"))
+    except (ValueError, TypeError):
+        return None
+
+def _month_before(date_value):
+    """'YYYY-MM' label for the calendar month immediately preceding date_value."""
+    if pd.isna(date_value):
+        return None
+    try:
+        return str(pd.Period(pd.Timestamp(date_value), freq="M") - 1)
+    except (ValueError, TypeError):
+        return None
+
+def build_target_trend_line(trend_array, release_date, inference_month_str):
+    """Same rendering as the retrieved-item cards' Trend line -- a date
+    window (release month through the month before InferenceTimestamp)
+    plus a plain comma-separated value sequence -- built from trend_array
+    instead of the colon-string. Matching the retrieved items' format here
+    matters: the old {timestamp, popularity_score} dict rendering was
+    implicated in own_estimate just echoing the last listed value rather
+    than reasoning over the trend, and giving the target a differently-shaped
+    history than its comps risked the model treating them as two different
+    kinds of object instead of the same kind of sequence.
+
+    Returns None for a debut item (empty or [-1]-sentinel trend_array) --
+    callers should render an explicit "No historical trend" note in that
+    case rather than an empty list literal.
+    """
+    trend_list = trend_array.tolist() if hasattr(trend_array, "tolist") else list(trend_array)
+    if len(trend_list) == 0 or (len(trend_list) == 1 and trend_list[0] == -1):
+        return None
+
+    start_label = _month_label(release_date)
+    end_label = _month_before(inference_month_str)
+
+    if start_label and end_label:
+        window = f", {start_label}" if start_label == end_label else f", {start_label} to {end_label}"
+        window += " (monthly)"
+    else:
+        window = ""
+    values_str = ", ".join(map(str, trend_list))
+    label = f"Trend{window}" if window else "Trend (full history)"
+
+    return f"{label}: {values_str}"
+
+def build_target_item_block(row, inference_month_str):
+    movie_description_text = build_movie_description(row)
+
+    if row['item_age'] == -1:
+        # Debut item -- no release history yet, same convention as the
+        # retrieved-item debut cards (which omit the Trend line entirely).
+        popularity_history_text = "Debut item — no historical trend available"
+    else:
+        trend_line = build_target_trend_line(
+            row['trend_array'], row.get('release_date'), inference_month_str
+        )
+        popularity_history_text = trend_line if trend_line is not None else "No historical trend"
+
+    return f"""
+<MovieDescription>{movie_description_text}</MovieDescription>
+
+<PopularityHistory>{popularity_history_text}</PopularityHistory>
+
+<InferenceTimestamp>{inference_month_str}</InferenceTimestamp>
+"""
+
+
+SYSTEM_PROMPT = """You are an expert movie popularity analyst. Your task is to predict a movie's popularity score at a given point in time, based on its own
+descriptive features, its historical popularity trajectory (when available), and a set of retrieved past movies with similar description and popularity patterns.
+
+### About <PopularityHistory>:
+<PopularityHistory> covers the target's own monthly popularity values from
+release through one month before <InferenceTimestamp> -- it does not
+include the value at <InferenceTimestamp> itself, which is what you are
+being asked to predict.
+
+### About <SimilarPastItems>:
+<SimilarPastItems> shows past movies retrieved for similar description and
+popularity pattern -- they will not necessarily match the target's outcome.
+For non-debut items, each item's own trend line covers its own history up through one month before its own outcome month; its outcome is stated only as a relative percentage change from that trend's last value (never the raw outcome number itself), showing how much the observed popularity moved.
+For debut items, neither a trend line nor an outcome value is provided, since there is no prior popularity history — only its own movie description and explanatory factors are available for these cases.
+
+Steps:
+1. First, estimate the target's popularity score using only <MovieDescription>
+   and <PopularityHistory> (when available). It's a specific number, not a category label.
+2. Then review <SimilarPastItems>. For each retrieved item, check whether
+   its trend trajectory and explanatory factors -- covering both its own
+   movie description and its own popularity history -- are actually
+   applicable to the target item. Use this review to adjust your step 1
+   estimate up, down, or keep it stable. Repeated factors across items
+   count as one signal, not reinforcement.
+
+Output a single, valid JSON object with exactly these two keys:
+
+- `reasoning`: must cover two things, in order -- (1) your step 1 initial
+  estimate and what it's based on, and (2) your justification for the
+  final predict_popularity_score, including whether and why
+  <SimilarPastItems> moved it up, down, or left it unchanged from that
+  initial estimate.
+- `predict_popularity_score`: your final predicted popularity score at the
+  given <InferenceTimestamp>. A non-negative number, formatted as a string
+  (decimals are allowed, do not strip the decimal point or round to an integer).
+
+Output only this JSON object, with nothing before or after.
+
+### Input format:
+
+<MovieDescription>...</MovieDescription>
+<PopularityHistory>...</PopularityHistory>
+<InferenceTimestamp>...</InferenceTimestamp>
+<SimilarPastItems>...</SimilarPastItems>
+"""
+def prepare_batch_input(df, model, variant_tag, inference_month_str,
+                         include_retrieval=True, output_dir=".", seed=SEED):
     print(f"Preparing batch: variant={variant_tag} (include_retrieval={include_retrieval}), {len(df)} rows")
 
     batch_requests = []
@@ -152,14 +372,20 @@ def prepare_batch_input(df, model, variant_tag, inference_month_str, tokenizer,
         else:
             retrieved_section = f"<SimilarPastItems>\n{NO_RETRIEVAL_FALLBACK}\n</SimilarPastItems>"
 
-        target_item_block = build_target_item_block(row, inference_month_str, description_col=description_col)
+        target_item_block = build_target_item_block(row, inference_month_str)
 
         user_content = f"""{target_item_block}
 
         {retrieved_section}
         """
+        # Qwen2-7B natively supports up to 32768 tokens, far more than
+        # needed -- capped here to match Llama-2's context budget for a
+        # fair apples-to-apples comparison between the two models.
+        MAX_MODEL_LEN = 8192
+        SAFETY_MARGIN = 50
+        MAX_TOKENS_CEILING = 1600  # raised from 1000 -- see note below
 
-        prompt_tokens = len(tokenizer.encode(PRODUCT_SYSTEM_PROMPT + user_content))
+        prompt_tokens = len(_tokenizer.encode(SYSTEM_PROMPT + user_content))
         max_tokens = min(MAX_TOKENS_CEILING, MAX_MODEL_LEN - prompt_tokens - SAFETY_MARGIN)
         if max_tokens < 150:
             print(f"WARNING: {custom_id} has very little completion room ({max_tokens} tokens, prompt={prompt_tokens}) — may truncate or fail")
@@ -170,32 +396,26 @@ def prepare_batch_input(df, model, variant_tag, inference_month_str, tokenizer,
         body = {
             "model": model,
             "messages": [
-                {"role": "system", "content": PRODUCT_SYSTEM_PROMPT},
+                {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_content},
             ],
             "temperature": 0.1,
             "top_p": 1,
-            "logit_bias": emoji_logit_bias,
+            "logit_bias": EMOJI_LOGIT_BIAS,
             "repetition_penalty": 1.15,
             "max_tokens": max_tokens,
             "response_format": {
                 "type": "json_schema",
                 "json_schema": {
-                    "name": "product_popularity_prediction",
+                    "name": "movie_popularity_prediction",
                     "schema": OUTPUT_JSON_SCHEMA,
                 },
             },
         }
 
-        # Per-request RNG seed. vLLM's OpenAI-compatible server otherwise
-        # defaults to the same RNG state across independent `vllm serve`
-        # launches, which produces byte-identical output (incl. free-text
-        # reasoning) across nominally-independent replicate runs even with
-        # temperature > 0 -- temperature/top_p shape the sampling
-        # distribution, but seed determines which draw you get from it.
-        # Pass a DIFFERENT --seed per run (1/2/3, ...) to get genuine
-        # run-to-run variance; the same seed on every run instead gives you
-        # reproducible-but-still-identical output, same as leaving it unset.
+        # Per-request RNG seed -- see the SEED config note above. Passed
+        # through unchanged from whatever `seed` this function was called
+        # with (defaults to the module-level SEED).
         if seed is not None:
             body["seed"] = seed
 
@@ -221,8 +441,7 @@ def prepare_batch_input(df, model, variant_tag, inference_month_str, tokenizer,
     print(f"Prepared {len(batch_requests)} requests")
     return batch_requests
 
-
-def run_via_vllm(batch_requests, variant_tag, output_dir=".", host="http://localhost:8000"):
+def run_via_vllm(batch_requests, variant_tag, output_dir=".", host=VLLM_HOST):
     """Sends each request to a running vLLM server and saves results to CSV
     incrementally (one row at a time), so progress survives a crash/interrupt.
     Skips custom_ids already present in an existing output file, so a
@@ -278,7 +497,8 @@ def run_via_vllm(batch_requests, variant_tag, output_dir=".", host="http://local
     print(f"Saved results -> {out_path} (ok={n_ok}, err={n_err}, skipped={n_skipped})")
     return out_path
 
-# def is_valid_result(content: str, inference_month_str: str) -> bool:
+
+# def is_valid_result(content: str, inference_month_str: str = INFERENCE_MONTH_STR) -> bool:
 #     if not content or not isinstance(content, str):
 #         return False
 #     try:
@@ -303,7 +523,7 @@ def run_via_vllm(batch_requests, variant_tag, output_dir=".", host="http://local
 #         return False
 #     return True
 
-def is_valid_result(content: str, inference_month_str: str) -> bool:
+def is_valid_result(content: str, inference_month_str: str = INFERENCE_MONTH_STR) -> bool:
     if not content or not isinstance(content, str):
         return False
     try:
@@ -333,18 +553,17 @@ def is_valid_result(content: str, inference_month_str: str) -> bool:
 def repair_incomplete_rows(
     out_path: str,
     batch_requests_by_id: dict,
-    inference_month_str: str,
-    host: str,
+    host: str = VLLM_HOST,
     max_retries: int = 3,
 ):
     """Reread out_path, find rows that failed to produce valid JSON,
     resend just those requests, and rewrite the CSV in place.
 
-    Unlike the Llama-2 Amazon version, every row gets a `was_repaired`
-    (bool) and `repair_temperature` column written -- whether the repair
-    attempt succeeded or not -- so there's a record of which rows needed a
-    retry and at what temperature the fix landed, instead of silently
-    overwriting content with no trace a repair happened."""
+    Every row gets a `was_repaired` (bool) and `repair_temperature` column
+    written -- whether the repair attempt succeeded or not -- so there's a
+    record of which rows needed a retry and at what temperature the fix
+    landed, instead of silently overwriting content with no trace a repair
+    happened."""
     df = pd.read_csv(out_path)
 
     if "was_repaired" not in df.columns:
@@ -352,7 +571,7 @@ def repair_incomplete_rows(
     if "repair_temperature" not in df.columns:
         df["repair_temperature"] = None
 
-    bad_mask = ~df["content"].apply(lambda c: is_valid_result(c, inference_month_str))
+    bad_mask = ~df["content"].apply(is_valid_result)
     bad_ids = df.loc[bad_mask, "custom_id"].tolist()
     print(f"{len(bad_ids)} / {len(df)} rows need repair")
 
@@ -379,7 +598,7 @@ def repair_incomplete_rows(
                 print(f"  {custom_id} attempt {attempt} errored: {e}")
                 continue
 
-            if is_valid_result(content, inference_month_str):
+            if is_valid_result(content):
                 fixed_content = content
                 fixed_status = resp.status_code
                 fixed_temperature = retry_body["temperature"]
@@ -400,118 +619,43 @@ def repair_incomplete_rows(
             df.at[idx, "was_repaired"] = True  # attempted but not fixed
 
     df.to_csv(out_path, index=False)
-    still_bad = (~df["content"].apply(lambda c: is_valid_result(c, inference_month_str))).sum()
+    still_bad = (~df["content"].apply(is_valid_result)).sum()
     print(f"Repair pass done. {still_bad} rows remain invalid.")
 
-
 def main():
-    parser = argparse.ArgumentParser(
-        description="Run vLLM batch inference (Qwen2-7B) for one Amazon "
-                     "category, from s17's retrieval-context CSV(s), with "
-                     "resume + repair passes."
-    )
-    parser.add_argument('--category', choices=['baby', 'home_and_kitchen'], required=True)
-    parser.add_argument('--model', default="qwen2-7b",
-                         help="Must match the --model/positional arg vLLM was started with.")
-    parser.add_argument('--tokenizer-path', default=None,
-                         help="Defaults to --model (local HF-format checkpoint dir/name).")
-    parser.add_argument('--vllm-host', default=None,
-                         help="Overrides --vllm-port / VLLM_PORT entirely, e.g. http://localhost:8001.")
-    parser.add_argument('--vllm-port', default=os.environ.get("VLLM_PORT", "8000"),
-                         help="Used to build http://localhost:<port> when --vllm-host isn't given. "
-                              "Defaults to the VLLM_PORT env var (as exported by the PBS job script), else 8000.")
-    parser.add_argument('--retrieval-csv-template', default=None,
-                         help="Defaults to processed_results/{category}/retrieved_context/"
-                              "{category}_retrieval_context_per_query_embed_rerank_k{{k}}_a50_b50_gtprior0.csv "
-                              "(s17_retrieved_item_formatting_component_ablation.py's default output naming) -- "
-                              "must contain a literal '{{k}}' placeholder.")
-    parser.add_argument('--k-values', default="1,5,10",
-                         help="Comma-separated K values, matching the ones s17 was run with.")
-    parser.add_argument('--output-dir', default=None,
-                         help="Defaults to qwen2_7b_output/amazon_{category}/run_1")
-    parser.add_argument('--inference-month', default=None,
-                         help="Overrides the predict_timestamp read from the data.")
-    parser.add_argument('--description-col', default='product_description')
-    parser.add_argument('--max-retries', type=int, default=3,
-                         help="Repair-pass retry attempts per invalid row.")
-    parser.add_argument('--seed', type=int, default=None,
-                         help="Per-request RNG seed passed to vLLM (e.g. 1/2/3 for "
-                              "replicate runs 1/2/3). Left unset, vLLM's OpenAI-"
-                              "compatible server defaults to the same RNG state on "
-                              "every launch, so 'independent' runs come back "
-                              "byte-identical despite temperature=0.1 -- pass a "
-                              "DIFFERENT --seed per run to get genuine variance.")
-    args = parser.parse_args()
-
-    category = args.category
-    vllm_host = args.vllm_host or f"http://localhost:{args.vllm_port}"
-    output_dir = args.output_dir or f"qwen2_7b_output/amazon_{category}/run_1"
-    k_values = [int(k) for k in args.k_values.split(",")]
-    retrieval_csv_template = args.retrieval_csv_template or (
-        f"processed_results/{category}/retrieved_context/"
-        f"{category}_retrieval_context_per_query_embed_rerank_k{{k}}_a50_b50_gtprior0.csv"
-    )
-
-    if args.seed is None:
-        print("WARNING: --seed not set -- vLLM will use its default RNG state, "
-              "which is typically the SAME across independent server launches. "
-              "If you're running multiple replicates to measure run-to-run "
-              "variance, pass a different --seed per run (e.g. 1, 2, 3) or every "
-              "run will come back identical.")
-
-    print(f"category={category}  model={args.model}  vllm_host={vllm_host}  output_dir={output_dir}  seed={args.seed}")
-
-    tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_path or args.model)
-    emoji_logit_bias = build_emoji_logit_bias(tokenizer)
-    if not emoji_logit_bias:
-        print("WARNING: emoji_logit_bias is empty -- Qwen2's tokenizer doesn't "
-              "expose '<0xF0>'-style byte tokens the way Llama-2's does. Emoji "
-              "banning via logit_bias will have NO effect for this model. If "
-              "emoji/symbol issues show up in Qwen2 outputs, this needs a "
-              "different approach (e.g. banning specific emoji token ids "
-              "directly, found by tokenizing sample emoji and inspecting ids).")
-
-    for k in k_values:
-        df = load_retrieval_csv(retrieval_csv_template.format(k=k))
-        inference_month_str = _resolve_inference_month(df, args.inference_month)
-        variant_tag = f"{category}_k{k}_full"
+    for k in K_VALUES:
+        df = load_retrieval_csv(k)
+        # df = sample_equal_per_direction(df, 80, target_high_pop=10).copy()
+        variant_tag = f"k{k}_full"
 
         requests_k = prepare_batch_input(
-            df, args.model, variant_tag, inference_month_str, tokenizer, emoji_logit_bias,
-            include_retrieval=True, output_dir=output_dir, description_col=args.description_col,
-            seed=args.seed,
+            df, MODEL, variant_tag, INFERENCE_MONTH_STR,
+            include_retrieval=True, output_dir=OUTPUT_DIR,
         )
-        run_via_vllm(requests_k, variant_tag, output_dir, host=vllm_host)
+        run_via_vllm(requests_k, variant_tag, OUTPUT_DIR)
 
+        # NEW: repair pass on this variant's output
         batch_requests_by_id = {req["custom_id"]: req for req in requests_k}
         repair_incomplete_rows(
-            out_path=f"{output_dir}/test_pred_results_{variant_tag}.csv",
+            out_path=f"{OUTPUT_DIR}/test_pred_results_{variant_tag}.csv",
             batch_requests_by_id=batch_requests_by_id,
-            inference_month_str=inference_month_str,
-            host=vllm_host,
-            max_retries=args.max_retries,
         )
 
-    df_no_retrieval = load_retrieval_csv(retrieval_csv_template.format(k=k_values[0]))
-    inference_month_str = _resolve_inference_month(df_no_retrieval, args.inference_month)
+    df_no_retrieval = load_retrieval_csv(K_VALUES[0])
+    # subset_no_retrieval = sample_equal_per_direction(df_no_retrieval, 80, target_high_pop=10)
     df_no_retrieval = df_no_retrieval.drop(columns=['retrieved_context']).copy()
-    variant_tag_nr = f"{category}_no_retrieval"
     requests_no_retrieval = prepare_batch_input(
-        df_no_retrieval, args.model, variant_tag_nr, inference_month_str, tokenizer, emoji_logit_bias,
-        include_retrieval=False, output_dir=output_dir, description_col=args.description_col,
-        seed=args.seed,
+        df_no_retrieval, MODEL, "no_retrieval", INFERENCE_MONTH_STR,
+        include_retrieval=False, output_dir=OUTPUT_DIR,
     )
-    run_via_vllm(requests_no_retrieval, variant_tag_nr, output_dir, host=vllm_host)
+    run_via_vllm(requests_no_retrieval, "no_retrieval", OUTPUT_DIR)
 
+    # NEW: repair pass on the no-retrieval variant's output
     batch_requests_by_id_no_retrieval = {req["custom_id"]: req for req in requests_no_retrieval}
     repair_incomplete_rows(
-        out_path=f"{output_dir}/test_pred_results_{variant_tag_nr}.csv",
+        out_path=f"{OUTPUT_DIR}/test_pred_results_no_retrieval.csv",
         batch_requests_by_id=batch_requests_by_id_no_retrieval,
-        inference_month_str=inference_month_str,
-        host=vllm_host,
-        max_retries=args.max_retries,
     )
-
 
 if __name__ == "__main__":
     main()
