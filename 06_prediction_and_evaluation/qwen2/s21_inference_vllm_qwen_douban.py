@@ -18,7 +18,6 @@ from transformers import AutoTokenizer
 
 # ── CONFIG ────────────────────────────────────────────────────────────────
 RETRIEVAL_CSV_TEMPLATE = (
-    # "synthetic_data_generation/260827/260828_test/gpt4o/0904_full_simple_prompt_v4/mapping_k{k}_a50_b50_sig1_gtcase1_gtprior1.csv"
     "0911_douban_test_retrieved_format/retrieval_context_per_query_embed_rerank_k{k}_a50_b50_sig1_gtcase1_gtprior0_simscore0.csv"
 )
 _TREND_ARRAY_SPLIT_PATTERN = re.compile(r"[,\s]+")
