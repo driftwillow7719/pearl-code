@@ -24,7 +24,7 @@ Folders are numbered in execution order, so one component of the framework can s
 | | Grouping and Profiling | `03_clustering_and_indexing/` (`s5_save_eight_groups.py`, correlation studies `s6`-`s8`) |
 | **2. Experience Retrieval** | Outcome Group Selection | `04_data_analyst_feature_selection/`, `05_retrieval_and_formatting/s14_retrieve_top1_centers.py` |
 | | Within-group Case Retrieval | `03_.../s16_indexing.py`, `05_retrieval_and_formatting/s17_...py` |
-| **3. Predictor-Agnostic Forecasting** | Prediction prompts per predictor | `06_prediction_and_evaluation/` (`gpt4omini/`, `llama3/`, `qwen2/`, `deepseek/`) |
+| **3. Predictor-Agnostic Forecasting** | Prediction prompts per predictor | `06_prediction_and_evaluation/system_prompts/`|
 | Outside the framework | Evaluation, baselines, analyses | `06_.../s23`, `s24`, `metric_measurement_*_utils.py`, `top_pop/`, `trail_retrieval/`; `07_retrieval_quality/`; `08_complementary_study/` |
 | Utilities | OpenAI Batch API helpers | `supporting_api_scripts/` |
 
@@ -66,7 +66,7 @@ Combines a personalized recommender's score with our predicted popularity, `s_ne
 `s24` computes HR / NDCG (using `metrics.py`); `s25` formats the tables. The HGN and LLM-ESR scores come from their own code (not included);
 for Baby and Douban their NPZ export is converted with `convert_npz_to_long.py`.
 
-## TRAIL + Retrieval
+## TRAIL + PEARL
 
 We run the TRAIL baseline with only its system prompt changed, extended to describe the retrieved `<SimilarPastItems>` block. The TRAIL code
 is not modified or included; use the authors' implementation (https://github.com/Revive-dontwanttocode/TRAIL, `master` branch) with the prompts in
